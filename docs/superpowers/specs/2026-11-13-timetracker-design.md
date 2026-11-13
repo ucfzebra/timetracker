@@ -547,6 +547,26 @@ just that time got logged.
   user's phone if **Teams/Outlook mobile** (work-managed) is installed. That is
   the recommended weekend channel. Forwarding to a personal email address is
   *not* built in, because it usually breaks company policy.
+**Home nagging via Home Assistant / n8n (requested; open decision D5).**
+Reminders can also come from the home automation the user already runs, through
+the HA companion app on the phone, speaker announcements and so on.
+- **Option H1 (recommended): the home side owns the schedule.** An HA
+  automation (or n8n workflow) runs the same weekly schedule (Thu evening →
+  Sun) and sends **actionable** phone notifications with a **"Submitted ✓"**
+  button. Tapping it silences that week. **No work data or work email crosses
+  to the personal side at all.** The cost is that it doesn't know about
+  submissions you made at work until you tap the button.
+- **Option H2: the work side sends a signal email.** Power Automate sends a
+  bare email from the work address to a dedicated personal mailbox that HA's
+  IMAP integration or n8n's IMAP trigger watches:
+  `Subject: TT-SIGNAL WEEK_OPEN 2026-W46` or `TT-SIGNAL WEEK_DONE 2026-W46`,
+  with an **empty body**: no hours, names or numbers. `WEEK_DONE` stops the home
+  nagging automatically. ⚠ This is still an automated work-to-personal email.
+  Company policy and connector-restriction (DLP) rules may forbid or block it.
+  Check before enabling, and keep it off by default.
+- The two can be combined: H1's schedule, with H2's `WEEK_DONE` as an automatic
+  silencer if it is allowed.
+
 - If the status file is missing (Ledger not opened that day), the flow still
   sends the 16:30 reminder.
 - Inside Ledger: a banner on the Today screen when the day before isn't
@@ -593,6 +613,7 @@ just that time got logged.
 | D1 | Sending | **Decided: one tap from the phone.** Ledger also works fully on its own (§8.4). |
 | D2 | Rounding rule | **Decided:** per day per charge #, nearest 0.1, half-up |
 | D3 | Week start | **Decided:** Monday. Workdays Mon–Thu (4/10). |
+| D5 | Home nagging: H1 (home schedule + "Submitted" button) / H2 (work signal email) / both | H1; H2 only if policy allows |
 | D4 | Work-side runtime (Python / Excel / HTML) | Builder checks the laptop and picks, in that order |
 
 ---
