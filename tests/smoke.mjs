@@ -101,6 +101,12 @@ step('idb backend round-trips each table', async ({ page }) => {
   for (const [t, o] of Object.entries(r)) {
     if (!o.get || !o.all || !o.missing) throw new Error(`idb ${t}: ${JSON.stringify(o)}`);
   }
+  const rejected = await page.evaluate(async () => {
+    const { openIdbBackend } = await import('./src/store/idb.js');
+    const b = await openIdbBackend('capture-smoke-bad-' + Date.now());
+    try { await b.put('entries', { no_key: 1 }); return false; } catch { return true; }
+  });
+  if (!rejected) throw new Error('put without key did not reject');
 });
 
 

@@ -10,6 +10,7 @@ export async function render(el) {
       'Tap the Share button.',
       'Choose Add to Home Screen, then tap Add.',
       'Open Capture from the new icon. It works offline after the first load.'),
+    h('p', { id: 'home-screen-warning' }, 'Always open Capture from the home-screen icon — Safari tabs keep separate data that iOS may delete after 7 days.'),
     h('h2', {}, 'Dictation'),
     h('p', {}, 'Tap the microphone on the iPhone keyboard, speak, then press go. On Windows, press Win+H.'),
     h('h2', {}, 'Privacy rule'),

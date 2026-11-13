@@ -27,7 +27,15 @@ export function openIdbBackend(name = 'capture', version = 1) {
       };
       resolve({
         get: (t, key) => wrap(store(t, 'readonly').get(key)),
-        put: async (t, obj) => { await wrap(store(t, 'readwrite').put(obj)); },
+        // Resolves only once the transaction has committed; rejects on abort or error.
+        put: (t, obj) => new Promise((resolve, reject) => {
+          if (!STORES[t]) throw new Error(`unknown table: ${t}`);
+          const tx = db.transaction(t, 'readwrite');
+          tx.oncomplete = () => resolve();
+          tx.onabort = () => reject(tx.error || new Error('transaction aborted'));
+          tx.onerror = () => reject(tx.error);
+          tx.objectStore(t).put(obj);
+        }),
         all: (t) => wrap(store(t, 'readonly').getAll()),
       });
     };
