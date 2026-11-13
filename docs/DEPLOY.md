@@ -6,7 +6,7 @@ Capture is static files in `app/` — no build step. All user data stays on the 
 1. Sign in at dash.cloudflare.com (a free account is fine).
 2. **Workers & Pages → Create → Pages → Connect to Git.** Authorize the Cloudflare GitHub app for **only** the `timetracker` repo (it can stay private).
 3. Project settings:
-   - **Production branch:** `claude/pensive-volta-9h1pep` (change to `main` later if you create one)
+   - **Production branch:** `claude/pensive-volta-9h1pep` (change to `main` later if you create one). Live: https://timetracker.ucfzebra.workers.dev
    - **Framework preset:** None
    - **Build command:** *(leave empty)*
    - **Build output directory:** `app`
