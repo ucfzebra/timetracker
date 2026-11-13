@@ -255,6 +255,52 @@ the phone. Any nickname the work side hasn't seen yet shows up there as
   **One tap to send.**
 - **Decision (user):** one-tap sending. No cloud service in v1.
 
+### 6.6 Quick add: voice or typed sentence (both apps)
+
+**Requested feature.** A single **Quick add** line at the top of the Today screen,
+with a 🎤 button. You speak or type one sentence and the app fills in the form.
+
+- **Voice comes from the operating system's dictation**: the iPhone keyboard
+  mic, or Windows `Win + H` on the work laptop. That way the app has no speech
+  engine of its own, no permissions to request and nothing extra to approve. The
+  app only **parses text**. *(Designer's call: the browser's built-in speech
+  API is unreliable in iPhone home-screen web apps, and it would be another
+  route for audio to leave the device.)*
+- The parser uses **simple fixed rules (no AI model, no network)** and is the
+  **same specification on both sides**, so a sentence works identically on the
+  phone and in Ledger.
+- **Nothing is saved from a sentence without a preview.** The parsed fields
+  appear in the normal form for a one-tap Save or a quick fix.
+- The blocked-word guard (§6.4) runs on the parsed result as usual.
+
+**Sentence patterns**
+
+| You say | Result |
+|---|---|
+| `Falcon design review 9 to 11:45` | Falcon · "design review" · 09:00–11:45 |
+| `Heron test procedure for 45 minutes` | Heron · "test procedure" · 45 min, today |
+| `Admin training an hour and a half yesterday` | Admin · "training" · 90 min, yesterday |
+| `start Falcon design review` | starts the timer |
+| `switch to Heron drawing check` | stops the current timer, starts a new one |
+| `stop` | stops the timer |
+| `Falcon design review 1 to 2:30 note rev B drawings` | …with description "rev B drawings" |
+
+**Parsing rules**
+- **Nickname:** the first word or words that match a nickname, ignoring case.
+  Allow one-letter typos and trailing "'s" or "s" (dictation often hears
+  "Falcon's"). If nothing matches, leave the field empty and highlight it.
+- **Times:** `9`, `9:30`, `930`, `nine thirty`, `9 am`, `2 pm`, `noon`. For
+  hours without am/pm, assume **7–11 = am and 12–6 = pm** (adjustable in
+  settings).
+- **Durations:** `45 minutes`, `1.5 hours`, `an hour and a half`,
+  `2 hours 15`, `90 min`.
+- **Day words:** `today` (default), `yesterday`, weekday names (meaning the most
+  recent one).
+- **Description:** everything after the word `note`.
+- **Task:** whatever is left, trimmed.
+- The parser lives in one plain module with a **table of test sentences**
+  (the ones above plus edge cases), and both apps must pass the same table.
+
 ---
 
 ## 7. Email contract (phone → work)
@@ -424,6 +470,20 @@ easier to fill in and check.
 | Outlook mail | Outlook COM or Graph | Count/subjects of sent mail per hour | Keep subjects local, never send them out. |
 | Jira | REST API + personal access token | Issues you transitioned, commented on or logged work against | Needs a PAT; check whether your instance allows them. |
 | Teams | Graph (chats/meetings) | Meetings attended, chat activity bursts | Often blocked without admin approval; treat as optional. |
+
+**Sent email (requested; first Phase 2 source together with the calendar).**
+Sent mail is a strong sign of what you worked on. A flow (Power Automate "When
+an email is sent", or a scheduled read of Sent Items) writes one suggestion per
+**activity block**: sent emails less than 30 min apart are grouped together, and
+each block runs from 10 min before the first send to the last send. A suggested
+project comes from rules you write in Ledger, checked in order:
+1. A Jira key in the subject (`ABC-123` → that Jira project's nickname).
+2. Recipient address, domain or distribution list (e.g. `*@customer-x.com` → Falcon).
+3. A keyword in the subject.
+4. Otherwise: no suggestion, and you pick.
+
+Subjects and recipients stay on the work side. Only the time block and the
+suggested project become an entry, and only when you accept it.
 
 **Behaviour:** the work app builds a **Suggested log** timeline for the day
 (e.g. `09:00–09:30 Meeting "Sprint standup"`, `10:12–11:40 Jira ABC-123 →

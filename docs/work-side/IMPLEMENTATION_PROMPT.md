@@ -154,6 +154,40 @@ entry. Deleting sets `deleted=1`. If a later import brings a newer `updated_at`
 for the same entry, the import wins, so a deliberate edit at work should bump
 `updated_at` to now.
 
+## Quick add: voice or typed sentence
+
+Ledger's Today screen has a single **Quick add** text box. I will often fill it
+with Windows dictation (`Win + H`), so Ledger needs no speech code of its own,
+just a text parser. Use **fixed rules only (no AI model, no network)**. Parse the
+sentence into the normal entry form and **always show it for confirmation**,
+never save directly.
+
+- Patterns: `<nickname> <task> <time> to <time>`, `<nickname> <task> for
+  <duration>`, `start <nickname> <task>`, `switch to <nickname> <task>`,
+  `stop`. Optional day word (`today` default, `yesterday`, a weekday name =
+  most recent one). Optional `note <description>` at the end.
+- Nickname: case-insensitive match on project nicknames (and project names).
+  Allow one-letter typos and a trailing "'s"/"s". If nothing matches, leave it
+  blank and highlight it.
+- Times: `9`, `9:30`, `930`, `nine thirty`, `9 am`, `2 pm`, `noon`. Hours
+  without am/pm: 7–11 → am, 12–6 → pm (setting).
+- Durations: `45 minutes`, `1.5 hours`, `an hour and a half`, `2 hours 15`,
+  `90 min`.
+- Task = whatever is left, trimmed.
+
+Required test sentences (with an empty settings file and today = 2026-11-13, Thu):
+
+| Input | Expected |
+|---|---|
+| `Falcon design review 9 to 11:45` | Falcon, "design review", 09:00–11:45, 165 min, 2026-11-13 |
+| `Heron test procedure for 45 minutes` | Heron, "test procedure", 45 min |
+| `Admin training an hour and a half yesterday` | Admin, "training", 90 min, 2026-11-12 |
+| `falcons design review 1 to 2:30 note rev B` | Falcon, "design review", 13:00–14:30, description "rev B" |
+| `switch to Heron drawing check` | action switch, Heron, "drawing check" |
+| `stop` | action stop |
+| `Kestral sync for 30 min` (nickname Kestrel exists) | Kestrel, "sync", 30 min |
+| `Zebra thing for 10 min` (no such nickname) | nickname blank and highlighted, task "Zebra thing", 10 min |
+
 ## Hours and rounding (must be exact)
 
 - Convert minutes to tenths using **integer maths**, never floating point:
@@ -266,6 +300,14 @@ and the company's connector-restriction (DLP) policies allow it). It writes one
 suggestions CSV per source into a OneDrive folder `TT/suggestions` that syncs to
 this laptop. Write me the flow-building instructions when we get to Phase 2.
 Use built-in Python integrations only for sources Power Automate can't reach.
+
+**Sent email is the first source to build** (together with the calendar). Group
+sent emails less than 30 min apart into one activity block, running from 10 min
+before the first send to the last send. Suggest a project using rules I edit in
+Ledger, checked in this order: a Jira key in the subject → that Jira project's
+nickname; recipient address/domain/distribution-list pattern → nickname; subject
+keyword → nickname; otherwise none. Show the subjects to me as context, locally
+only.
 
 Each suggestion can be mapped to a nickname or project (with rules I define,
 e.g. "Jira project ABC → Falcon", "calendar category Overhead → Admin"), and
