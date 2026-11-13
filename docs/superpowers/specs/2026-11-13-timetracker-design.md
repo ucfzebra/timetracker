@@ -566,6 +566,27 @@ the HA companion app on the phone, speaker announcements and so on.
   Check before enabling, and keep it off by default.
 - The two can be combined: H1's schedule, with H2's `WEEK_DONE` as an automatic
   silencer if it is allowed.
+- **Option H3 (recommended, with H1 as backstop): use the official timekeeping
+  system's own emails as the trigger.** The official system already copies its
+  reminder notices to the user's personal address, so no new work-to-personal
+  flow is needed. HA (IMAP integration) or n8n (Gmail/IMAP trigger) watches
+  for them:
+  - the *weekly "complete timesheet" reminder* → start the weekly escalation
+    (Thu evening → Sun), and
+  - the *"daily incomplete time" notice* (sent around midnight when a day is
+    missing) and any manager "missing input" email → **urgent** morning nag
+    before the official daily deadline (see below).
+
+  The sender addresses and subject patterns live **only in the HA/n8n
+  configuration**, never in this repo. The **"Submitted ✓"** notification
+  button silences the alerts.
+
+**Official deadline (found in the official reminder text):** each day's time must
+be entered no later than **1.5 h after the start of the next day worked**. So
+the *daily* reminders are not optional. They are the real compliance deadline.
+On a 4/10 schedule, Thursday's time is due 1.5 h into **Monday**. Ledger needs a
+**workday start time** setting, and the next-morning nag fires at start time,
+then every 30 min until the deadline.
 
 - If the status file is missing (Ledger not opened that day), the flow still
   sends the 16:30 reminder.
@@ -613,7 +634,7 @@ the HA companion app on the phone, speaker announcements and so on.
 | D1 | Sending | **Decided: one tap from the phone.** Ledger also works fully on its own (§8.4). |
 | D2 | Rounding rule | **Decided:** per day per charge #, nearest 0.1, half-up |
 | D3 | Week start | **Decided:** Monday. Workdays Mon–Thu (4/10). |
-| D5 | Home nagging: H1 (home schedule + "Submitted" button) / H2 (work signal email) / both | H1; H2 only if policy allows |
+| D5 | Home nagging: H1 / H2 / H3 | H3 (official reminder emails as trigger) + H1 schedule as backstop |
 | D4 | Work-side runtime (Python / Excel / HTML) | Builder checks the laptop and picks, in that order |
 
 ---
