@@ -1,4 +1,4 @@
-import { h, hmm, prettyDate } from './dom.js';
+import { h, hmm, prettyDate, busy } from './dom.js';
 import { parseQuickAdd } from '../core/quickadd.js';
 import { dayTotals } from '../core/summary.js';
 import { todayBanners } from '../core/banners.js';
@@ -24,14 +24,14 @@ function elapsed(entry) {
 function firstRun(el, { store, navigate }) {
   const err = h('p', { class: 'error', role: 'alert' });
   const input = h('input', { id: 'first-nick', type: 'text', maxlength: 24, placeholder: 'e.g. Falcon', autocomplete: 'off' });
-  const add = async () => {
+  const add = busy(async () => {
     try {
       await store.addNickname(input.value);
-      navigate('#/today');
+      await navigate('#/today');
     } catch (e) {
       err.textContent = e.message;
     }
-  };
+  });
   el.append(
     h('h1', {}, 'Add your first nickname'),
     h('p', { class: 'muted' }, 'A nickname is a short code name for a project. No real project names or charge numbers on this phone.'),
@@ -75,7 +75,7 @@ export async function render(el, ctx) {
     if (b.kind === 'week') {
       box.append(h('button', {
         class: 'primary',
-        onclick: async () => { await store.setSetting('weekAckFor', weekStart(today)); refresh(); },
+        onclick: busy(async () => { await store.setSetting('weekAckFor', weekStart(today)); await refresh(); }),
       }, 'Week submitted ✓'));
     }
     if (b.kind === 'backup') box.append(h('a', { href: '#/settings' }, 'Settings'));
@@ -99,7 +99,7 @@ export async function render(el, ctx) {
   sel.addEventListener('change', loadTasks);
   loadTasks();
 
-  const act = (fn) => async () => { msg.textContent = ''; try { await fn(); refresh(); } catch (e) { fail(e); } };
+  const act = (fn) => busy(async () => { msg.textContent = ''; try { await fn(); await refresh(); } catch (e) { fail(e); } });
   const startBtn = h('button', { class: 'primary', id: 'start', onclick: act(() => store.startTimer(sel.value, task.value.trim(), note.value.trim())) }, '▶ Start timer');
   const manualBtn = h('button', {
     id: 'manual',
@@ -130,27 +130,36 @@ export async function render(el, ctx) {
 
   // ---- quick add
   const quick = h('input', { id: 'quick', type: 'text', placeholder: 'e.g. Falcon design review 9 to 11:45', autocomplete: 'off', enterkeyhint: 'go' });
+  let quickBusy = false;
   const quickGo = async () => {
+    if (quickBusy) return;
     msg.textContent = '';
     const text = quick.value.trim();
     if (!text) return;
+    quickBusy = true;
+    quick.disabled = true;
     const p = parseQuickAdd(text, { nicknames: nicks, today });
     try {
       if (p.action === 'stop') {
         if (!run) throw new Error('No timer is running.');
         if (!confirm(`Stop the timer on ${run.nickname}?`)) return;
         await store.stopTimer();
-        refresh();
+        await refresh();
       } else if (p.action === 'start' || p.action === 'switch') {
         if (!p.nickname) throw new Error('Nickname not recognised. Say it first, e.g. "start Falcon design review".');
         if (!confirm(`${p.action === 'start' ? 'Start' : 'Switch to'} ${p.nickname}: ${p.task || '(no task)'}?`)) return;
         await store.startTimer(p.nickname, p.task, p.description);
-        refresh();
+        await refresh();
       } else {
         sessionStorage.setItem('capture.prefill', JSON.stringify(p));
-        navigate('#/edit/new');
+        await navigate('#/edit/new');
       }
-    } catch (e) { fail(e); }
+    } catch (e) {
+      fail(e);
+    } finally {
+      quickBusy = false;
+      quick.disabled = false;
+    }
   };
   quick.addEventListener('keydown', (e) => { if (e.key === 'Enter') quickGo(); });
 

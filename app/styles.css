@@ -79,6 +79,7 @@ button, .btn {
   background: var(--surface);
   color: var(--text);
   cursor: pointer;
+  touch-action: manipulation;
 }
 button.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-text); }
 button.danger { color: var(--danger); }

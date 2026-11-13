@@ -161,6 +161,20 @@ step('quick add opens Edit prefilled, Save stores it', async ({ page }) => {
   if (parseFloat(total) < 2.8) throw new Error('day total: ' + total);
 });
 
+step('double-click Save on a new entry creates exactly one entry', async ({ page }) => {
+  const before = await countEntries(page);
+  await goto(page, '#/edit/new');
+  await page.waitForSelector('#save');
+  await page.fill('#start', '12:00');
+  await page.fill('#end', '12:30');
+  await page.fill('#task', 'double');
+  await page.dblclick('#save');
+  await onToday(page);
+  await page.waitForTimeout(300);
+  const after = await countEntries(page);
+  if (after !== before + 1) throw new Error(`entries ${before} -> ${after}`);
+});
+
 step('week shows Falcon row with today >= 2.8', async ({ page }) => {
   await page.click('#nav a[data-route="week"]');
   await page.waitForSelector('#grid');

@@ -124,3 +124,34 @@ test('getEntry returns the entry or null', async () => {
   assert.equal((await store.getEntry(e.entry_id)).task, 'Review');
   assert.equal(await store.getEntry('nope'), null);
 });
+
+test('concurrent startTimer calls leave exactly one running entry; the first is ended', async () => {
+  const { store } = setup();
+  const [a, b] = await Promise.all([store.startTimer('Falcon', 'a', ''), store.startTimer('Falcon', 'b', '')]);
+  const all = await store.entriesBetween('2026-01-01', '2026-12-31');
+  assert.equal(all.length, 2);
+  assert.equal(all.filter((e) => e.start && !e.end).length, 1);
+  assert.equal((await store.running()).entry_id, b.entry_id);
+  assert.equal(all.find((e) => e.entry_id === a.entry_id).end, '09:00');
+});
+
+test('concurrent stop + switch never leaves two running', async () => {
+  const { store } = setup();
+  await store.startTimer('Falcon', 'a', '');
+  await Promise.all([store.switchTimer('Falcon', 'b', ''), store.switchTimer('Falcon', 'c', ''), store.stopTimer()]);
+  const all = await store.entriesBetween('2026-01-01', '2026-12-31');
+  assert.ok(all.filter((e) => e.start && !e.end).length <= 1);
+});
+
+test('concurrent addEntry calls both create entries (mutex does not drop)', async () => {
+  const { store } = setup();
+  await Promise.all([store.addEntry(base), store.addEntry(base)]);
+  assert.equal((await store.entriesBetween('2026-11-10', '2026-11-10')).length, 2);
+});
+
+test('a failing timer op does not jam the mutex', async () => {
+  const { store } = setup();
+  await assert.rejects(() => store.startTimer('', 'x', ''));
+  const e = await store.startTimer('Falcon', 'ok', '');
+  assert.equal((await store.running()).entry_id, e.entry_id);
+});

@@ -33,3 +33,22 @@ export const monthDay = (ymd) => {
   const [, m, d] = ymd.split('-').map(Number);
   return `${MONTHS[m - 1]} ${d}`;
 };
+
+// Wraps an async click handler so it runs at most once at a time. The clicked button stays
+// disabled until the handler settles, including any navigation it awaits, so a double tap
+// cannot repeat the action.
+export function busy(fn) {
+  let running = false;
+  return async function (ev) {
+    if (running) return undefined;
+    running = true;
+    const btn = ev && ev.currentTarget && 'disabled' in ev.currentTarget ? ev.currentTarget : null;
+    if (btn) btn.disabled = true;
+    try {
+      return await fn(ev);
+    } finally {
+      running = false;
+      if (btn) btn.disabled = false;
+    }
+  };
+}

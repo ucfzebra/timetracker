@@ -1,4 +1,4 @@
-import { h, fmtDur } from './dom.js';
+import { h, fmtDur, busy } from './dom.js';
 import { findBlocked } from '../core/guard.js';
 import { buildPatch } from '../core/patch.js';
 import { parseHHMM, durationMinutes, localDate, toTenths, formatTenths } from '../core/time.js';
@@ -89,7 +89,7 @@ export async function render(el, { store, navigate, params }) {
     }
     if (existing) await store.updateEntry(existing.entry_id, buildPatch(existing, { ...base, mode, start: '', end: '', duration_min: null, ...times }));
     else await store.addEntry({ ...base, ...times });
-    navigate('#/today');
+    await navigate('#/today');
   }
 
   async function save(force) {
@@ -105,7 +105,7 @@ export async function render(el, { store, navigate, params }) {
           h('p', {}, `⚠ ${quoted} ${hits.length > 1 ? 'are' : 'is'} on your blocked word list. ${strict ? 'Edit before saving.' : 'Edit before saving or tap Save anyway.'}`),
           h('div', { class: 'btn-row' },
             h('button', { id: 'warn-edit', onclick: () => (inTask || !desc.value ? task : desc).focus() }, 'Edit'),
-            strict ? null : h('button', { id: 'save-anyway', class: 'danger', onclick: () => save(true) }, 'Save anyway'))));
+            strict ? null : h('button', { id: 'save-anyway', class: 'danger', onclick: busy(() => save(true)) }, 'Save anyway'))));
         return;
       }
       await persist();
@@ -114,10 +114,10 @@ export async function render(el, { store, navigate, params }) {
     }
   }
 
-  async function del() {
+  const del = busy(async () => {
     if (!confirm('Delete this entry?')) return;
-    try { await store.deleteEntry(existing.entry_id); navigate('#/today'); } catch (e) { err.textContent = e.message; }
-  }
+    try { await store.deleteEntry(existing.entry_id); await navigate('#/today'); } catch (e) { err.textContent = e.message; }
+  });
 
   el.append(
     h('div', { class: 'edit-top' },
@@ -131,7 +131,7 @@ export async function render(el, { store, navigate, params }) {
     h('label', { for: 'task' }, 'Task'), task,
     h('label', { for: 'desc' }, 'Note'), desc,
     warn, err,
-    h('p', {}, h('button', { id: 'save', class: 'primary', onclick: () => save(false) }, 'Save')),
+    h('p', {}, h('button', { id: 'save', class: 'primary', onclick: busy(() => save(false)) }, 'Save')),
   );
   if (unmatched) nick.classList.add('flag');
   sync();

@@ -28,10 +28,20 @@ async function boot() {
   const store = createStore(await openIdbBackend(), { source: detectSource() });
   const view = document.getElementById('view');
   let token = 0;
+  let waiters = [];
 
-  const navigate = (hash) => {
+  // Resolves once the screen for `hash` has rendered, so callers can keep their button
+  // disabled through the navigation (a 5 s cap guards against a lost hashchange).
+  const navigate = (hash) => new Promise((resolve) => {
+    waiters.push(resolve);
+    setTimeout(resolve, 5000);
     if (location.hash === hash) render();
     else location.hash = hash;
+  });
+  const settle = () => {
+    const w = waiters;
+    waiters = [];
+    for (const r of w) r();
   };
 
   async function render() {
@@ -53,9 +63,14 @@ async function boot() {
       p.className = 'muted';
       p.textContent = "This screen isn't available yet.";
       view.append(p);
+      settle();
       return;
     }
-    await mod.render(view, { store, navigate, params });
+    try {
+      await mod.render(view, { store, navigate, params });
+    } finally {
+      if (mine === token) settle();
+    }
   }
 
   addEventListener('hashchange', render);

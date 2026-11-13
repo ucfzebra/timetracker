@@ -44,7 +44,16 @@ export function createStore(backend, { now = () => new Date(), source = 'web' } 
     return new Date(t > p ? t : p + 1).toISOString();
   }
 
-  async function addEntry(input) {
+  // Promise-chain mutex: entry writes and timer operations run one at a time, so two
+  // overlapping taps can never both see "nothing running" and start two timers.
+  let chain = Promise.resolve();
+  const serial = (fn) => (...args) => {
+    const p = chain.then(() => fn(...args));
+    chain = p.catch(() => {});
+    return p;
+  };
+
+  async function addEntryUnlocked(input) {
     const e = validate({
       nickname: input.nickname,
       date: input.date,
@@ -63,7 +72,9 @@ export function createStore(backend, { now = () => new Date(), source = 'web' } 
     return e;
   }
 
-  async function updateEntry(id, patch) {
+  const addEntry = serial(addEntryUnlocked);
+
+  const updateEntry = serial(async (id, patch) => {
     const prev = await backend.get('entries', id);
     if (!prev) throw new Error(`no such entry: ${id}`);
     const e = { ...prev, ...patch, entry_id: prev.entry_id, source: prev.source };
@@ -75,19 +86,19 @@ export function createStore(backend, { now = () => new Date(), source = 'web' } 
     e.updated_at = stamp(prev.updated_at);
     await backend.put('entries', e);
     return e;
-  }
+  });
 
   async function getEntry(id) {
     return (await backend.get('entries', id)) || null;
   }
 
-  async function deleteEntry(id) {
+  const deleteEntry = serial(async (id) => {
     const prev = await backend.get('entries', id);
     if (!prev) throw new Error(`no such entry: ${id}`);
     const e = { ...prev, deleted: true, updated_at: stamp(prev.updated_at) };
     await backend.put('entries', e);
     return e;
-  }
+  });
 
   async function entriesBetween(from, to, { includeDeleted = false } = {}) {
     const all = await backend.all('entries');
@@ -101,7 +112,7 @@ export function createStore(backend, { now = () => new Date(), source = 'web' } 
     return all.find((e) => !e.deleted && e.start && !e.end) || null;
   }
 
-  async function stopTimer() {
+  async function stopTimerUnlocked() {
     const r = await running();
     if (!r) return null;
     const n = now();
@@ -114,14 +125,16 @@ export function createStore(backend, { now = () => new Date(), source = 'web' } 
 
   // Validation runs inside addEntry; the previous timer is stopped only after we
   // know the new one is valid, so a bad nickname never stops the running timer.
-  async function startTimer(nickname, task = '', description = '') {
+  async function startTimerUnlocked(nickname, task = '', description = '') {
     validate({ nickname, task, description, duration_min: 0 });
-    await stopTimer();
+    await stopTimerUnlocked();
     const n = now();
     // start/end are set by hand: addEntry with only a start keeps duration 0.
-    return addEntry({ nickname, date: localDate(n), start: hhmm(n), end: '', duration_min: 0, task, description });
+    return addEntryUnlocked({ nickname, date: localDate(n), start: hhmm(n), end: '', duration_min: 0, task, description });
   }
 
+  const stopTimer = serial(stopTimerUnlocked);
+  const startTimer = serial(startTimerUnlocked);
   const switchTimer = startTimer;
 
   async function staleTimer() {
