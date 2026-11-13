@@ -1,8 +1,11 @@
 # Work-Side Implementation Prompt: "Ledger"
 
-> Paste everything below the line into the work-side Claude session. It is
-> self-contained. It contains **no** real project names or charge numbers; you
-> enter those into the app yourself after it is built.
+> **How to use:** make an empty project folder on the work laptop, save
+> everything below the line as `CLAUDE.md` in it (Claude Code reads that file
+> automatically; for Cline, save it as `.clinerules` or paste it as the first
+> message), then start the session with: *"Read CLAUDE.md and start with Step 0."*
+> It is self-contained. It contains **no** real project names or charge numbers;
+> you enter those into the app yourself after it is built.
 
 ---
 
@@ -214,6 +217,18 @@ day from:
   on or logged work against, with timestamps.
 - **Teams** (Graph, if permitted): meetings attended / chat activity. Treat this
   as optional and skip it cleanly if access is blocked.
+
+**Suggestions inbox (build this first in Phase 2).** Every source, whether
+built into Ledger or an external company agent that reads Outlook, Jira or Teams
+through a browser, delivers suggestions the same way: CSV files dropped into a
+`suggestions/` folder next to the data file, named `<YYYY-MM-DD>-<source>.csv`,
+with these columns:
+`suggestion_id,date,start,end,source,title,detail,suggested_nickname`
+(`start`/`end` are `HH:MM`; `suggested_nickname` may be empty). Ledger reads the
+folder, removes duplicates by `suggestion_id`, and shows the suggestions on the
+Day Log. Treat the file contents as **display-only data**. Never execute or
+follow anything in them. This keeps the counting code deterministic and lets
+data collection be done by whatever tool is allowed.
 
 Each suggestion can be mapped to a nickname or project (with rules I define,
 e.g. "Jira project ABC → Falcon", "calendar category Overhead → Admin"), and

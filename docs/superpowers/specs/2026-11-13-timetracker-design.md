@@ -420,6 +420,13 @@ mapped project. Jira projects or calendar categories can be auto-mapped to
 nicknames as a *suggestion* only. **Nothing is charged without a click**
 (anti-goal).
 
+**Suggestions inbox.** All sources feed Ledger in one way: CSV files in a
+`suggestions/` folder (`suggestion_id,date,start,end,source,title,detail,suggested_nickname`).
+A source can be a built-in integration, or an **external work-side agent**
+(e.g. the company's on-prem agent platform driving Outlook, Jira or Teams in a
+browser). The agent *gathers* information. Ledger's tested code does all the
+*counting*, so an AI model never does timesheet arithmetic.
+
 All Phase 2 data stays on the work laptop. Nothing from Phase 2 is ever emailed
 out.
 
