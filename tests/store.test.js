@@ -105,3 +105,15 @@ test('recentTasks, entriesBetween order, settings', async () => {
   await store.setSetting('windowDays', 7);
   assert.equal(await store.getSetting('windowDays'), 7);
 });
+
+test('editing description of a stopped 30 h entry keeps duration_min', async () => {
+  const { store, clock } = setup();
+  await store.startTimer('Falcon', '', '');
+  clock.adv(1800);
+  const stopped = await store.stopTimer();
+  assert.equal(stopped.duration_min, 1800);
+  const u = await store.updateEntry(stopped.entry_id, { description: 'edited' });
+  assert.equal(u.duration_min, 1800);
+  const v = await store.updateEntry(stopped.entry_id, { end: '10:00' });
+  assert.equal(v.duration_min, 60);
+});

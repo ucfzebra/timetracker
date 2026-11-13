@@ -14,12 +14,12 @@ const DEFAULTS = {
   weekAckFor: null,
 };
 
-function validate(e) {
+function validate(e, recompute = true) {
   if (typeof e.nickname !== 'string' || e.nickname.trim() === '') throw new RangeError('nickname required');
   for (const f of ['nickname', 'task', 'description']) {
     if (String(e[f] ?? '').length > LIMITS[f]) throw new RangeError(`${f} exceeds ${LIMITS[f]} characters`);
   }
-  if (e.start && e.end) {
+  if (recompute && e.start && e.end) {
     const d = durationMinutes(e.start, e.end);
     if (Number.isNaN(d)) throw new RangeError('invalid start/end');
     e.duration_min = d;
@@ -67,7 +67,10 @@ export function createStore(backend, { now = () => new Date(), source = 'web' } 
     const prev = await backend.get('entries', id);
     if (!prev) throw new Error(`no such entry: ${id}`);
     const e = { ...prev, ...patch, entry_id: prev.entry_id, source: prev.source };
-    validate(e);
+    // Recompute from start/end only when the patch touches them; otherwise keep the
+    // stored duration (a stopped timer may span more than 24 h).
+    const touchesTimes = 'start' in patch || 'end' in patch;
+    validate(e, touchesTimes && !('duration_min' in patch));
     e.nickname = e.nickname.trim();
     e.updated_at = stamp(prev.updated_at);
     await backend.put('entries', e);
