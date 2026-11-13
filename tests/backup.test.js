@@ -90,3 +90,32 @@ test('bad settings are skipped, good ones kept', () => {
   assert.equal(ok.skipped, 0);
   assert.equal(Object.keys(ok.settings).length, 4);
 });
+
+test('null task/description and missing/null start/end import as empty strings', () => {
+  const raw = good({ task: null, description: null });
+  delete raw.start; raw.end = null;
+  const r = mergeBackup(local(), inc({ entries: [raw] }));
+  assert.equal(r.skipped, 0);
+  const e = r.entries[0];
+  assert.deepEqual([e.task, e.description, e.start, e.end], ['', '', '', '']);
+});
+
+test('unknown fields are not stored; entry has exactly the contract fields', () => {
+  const r = mergeBackup(local(), inc({ entries: [good({ evil: 'x', __proto_x: 1 })] }));
+  assert.deepEqual(Object.keys(r.entries[0]).sort(), [
+    'date', 'deleted', 'description', 'duration_min', 'end', 'entry_id', 'nickname', 'source', 'start', 'task', 'updated_at']);
+});
+
+test('numeric task or description is skipped', () => {
+  const r = mergeBackup(local(), inc({ entries: [good({ task: 5 }), good({ description: 7 })] }));
+  assert.equal(r.entries.length, 0);
+  assert.equal(r.skipped, 2);
+});
+
+test('mixed-precision timestamps: truly newer row wins', () => {
+  const l = local({ entries: [good({ updated_at: '2026-11-10T10:00:00.500Z', task: 'local' })] });
+  // ...00Z is older than ...00.500Z though it sorts after as a string
+  assert.equal(mergeBackup(l, inc({ entries: [good({ updated_at: '2026-11-10T10:00:00Z', task: 'older' })] })).entries.length, 0);
+  const l2 = local({ entries: [good({ updated_at: '2026-11-10T10:00:00Z', task: 'local' })] });
+  assert.equal(mergeBackup(l2, inc({ entries: [good({ updated_at: '2026-11-10T10:00:00.500Z', task: 'newer' })] })).entries[0].task, 'newer');
+});

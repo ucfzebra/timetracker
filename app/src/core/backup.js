@@ -12,15 +12,16 @@ const DATE = /^\d{4}-\d{2}-\d{2}$/;
 const HHMM = /^([01]\d|2[0-3]):[0-5]\d$/;
 const ISO = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?Z$/;
 const str = (v, max) => typeof v === 'string' && v.length <= max;
+const orEmpty = (v) => (v === undefined || v === null ? '' : v);
 
 function validEntry(e) {
   return str(e.entry_id, 200) && e.entry_id !== ''
     && typeof e.nickname === 'string' && e.nickname.trim() !== '' && e.nickname.length <= LIM.nickname
-    && str(e.task ?? '', LIM.task) && str(e.description ?? '', LIM.description)
+    && str(orEmpty(e.task), LIM.task) && str(orEmpty(e.description), LIM.description)
     && typeof e.date === 'string' && DATE.test(e.date) && !Number.isNaN(Date.parse(e.date))
-    && ['start', 'end'].every((k) => e[k] === undefined || e[k] === '' || (typeof e[k] === 'string' && HHMM.test(e[k])))
+    && ['start', 'end'].every((k) => e[k] === undefined || e[k] === null || e[k] === '' || (typeof e[k] === 'string' && HHMM.test(e[k])))
     && Number.isInteger(e.duration_min) && e.duration_min >= 0
-    && typeof e.updated_at === 'string' && ISO.test(e.updated_at);
+    && typeof e.updated_at === 'string' && ISO.test(e.updated_at) && !Number.isNaN(Date.parse(e.updated_at));
 }
 
 const SETTING_CHECK = {
@@ -45,9 +46,15 @@ export function mergeBackup(local, incoming) {
   let skipped = 0;
   for (const raw of incoming.entries) {
     if (!raw || typeof raw !== 'object' || !validEntry(raw)) { skipped++; continue; }
-    const e = { ...raw, deleted: isTomb(raw.deleted) };
+    const e = {
+      entry_id: raw.entry_id, nickname: raw.nickname, date: raw.date,
+      start: orEmpty(raw.start), end: orEmpty(raw.end), duration_min: raw.duration_min,
+      task: orEmpty(raw.task), description: orEmpty(raw.description),
+      source: typeof raw.source === 'string' ? raw.source : '',
+      updated_at: raw.updated_at, deleted: isTomb(raw.deleted),
+    };
     const cur = have.get(e.entry_id);
-    if (!cur || String(e.updated_at ?? '') > String(cur.updated_at ?? '')) entries.push(e);
+    if (!cur || Date.parse(e.updated_at) > Date.parse(cur.updated_at)) entries.push(e);
   }
 
   const rows = new Map(local.nicknames.map((n) => [n.name, n]));
