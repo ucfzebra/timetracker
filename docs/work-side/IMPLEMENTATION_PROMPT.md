@@ -175,7 +175,7 @@ never save directly.
   `90 min`.
 - Task = whatever is left, trimmed.
 
-Required test sentences (with an empty settings file and today = 2026-11-13, Thu):
+Required test sentences (with an empty settings file and today = 2026-11-13, a Friday):
 
 | Input | Expected |
 |---|---|

@@ -159,7 +159,7 @@ the phone. Any nickname the work side hasn't seen yet shows up there as
 **Today: the main screen**
 ```
 ┌──────────────────────────────────┐
-│  Thu Nov 13            ⚙  ⇪ Send │
+│  Fri Nov 13            ⚙  ⇪ Send │
 ├──────────────────────────────────┤
 │  ● RUNNING  Falcon               │
 │    Design review        01:12:44 │
