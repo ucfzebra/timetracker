@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { prepareBatch, sendBatch } from '../app/src/send.js';
+import { prepareBatch, sendBatch, loadSendInput, prepareSend, deliver, mailtoUrl } from '../app/src/send.js';
 import { createStore } from '../app/src/store/store.js';
 import { createMemoryBackend } from '../app/src/store/memory.js';
 
@@ -74,7 +74,7 @@ test('sendBatch via share persists batch and lastSentAt after resolve', async ()
   await store.addEntry({ nickname: 'Falcon', date: '2026-11-13', start: '09:00', end: '10:00', task: 'x' });
   const shared = [];
   const nav = { canShare: () => true, share: async (d) => { shared.push(d); } };
-  const r = await sendBatch(store, { today: '2026-11-13', now, nav });
+  const r = await sendBatch(store, { today: '2026-11-13', now, nav, method: 'share' });
   assert.equal(r.ok, true);
   assert.equal(r.method, 'share');
   assert.equal(r.count, 1);
@@ -88,7 +88,7 @@ test('sendBatch: AbortError cancels, nothing persisted', async () => {
   await store.setSetting('workEmail', 'w@work.example');
   await store.addEntry({ nickname: 'Falcon', date: '2026-11-13', start: '09:00', end: '10:00', task: 'x' });
   const nav = { canShare: () => true, share: async () => { throw Object.assign(new Error('c'), { name: 'AbortError' }); } };
-  const r = await sendBatch(store, { today: '2026-11-13', now, nav });
+  const r = await sendBatch(store, { today: '2026-11-13', now, nav, method: 'share' });
   assert.equal(r.ok, false);
   assert.equal(r.reason, 'cancelled');
   assert.equal(await store.getSetting('batch'), 0);
@@ -102,7 +102,7 @@ test('sendBatch: mailto fallback opens link and persists', async () => {
   const opened = [];
   const r = await sendBatch(store, { today: '2026-11-13', now, nav: {}, open: (u) => opened.push(u) });
   assert.equal(r.method, 'mailto');
-  assert.ok(opened[0].startsWith('mailto:w@work.example?subject='));
+  assert.ok(opened[0].startsWith('mailto:w%40work.example?subject=%5BTT%5D'));
   assert.equal(await store.getSetting('batch'), 1);
 });
 
@@ -112,9 +112,83 @@ test('sendBatch: blocked sends nothing', async () => {
   await store.setSetting('blockedWords', ['Orion']);
   await store.addEntry({ nickname: 'Falcon', date: '2026-11-13', start: '09:00', end: '10:00', task: 'Orion' });
   let called = false;
-  const r = await sendBatch(store, { today: '2026-11-13', now, nav: { canShare: () => true, share: async () => { called = true; } } });
+  const r = await sendBatch(store, { today: '2026-11-13', now, method: 'share', open: () => { called = true; }, nav: { canShare: () => true, share: async () => { called = true; } } });
   assert.equal(r.ok, false);
   assert.equal(r.blocked.length, 1);
   assert.equal(called, false);
   assert.equal(await store.getSetting('batch'), 0);
+});
+
+async function ready(extra = {}) {
+  const store = mk();
+  await store.setSetting('workEmail', 'w+x@work.example');
+  await store.addEntry({ nickname: 'Falcon', date: '2026-11-13', start: '09:00', end: '10:00', task: 'x' });
+  for (const [k, v] of Object.entries(extra)) await store.setSetting(k, v);
+  return store;
+}
+
+test('default send is mailto even when share is available; address and subject encoded', async () => {
+  const store = await ready();
+  const opened = [];
+  let shared = false;
+  const nav = { canShare: () => true, share: async () => { shared = true; } };
+  const r = await sendBatch(store, { today: '2026-11-13', now, nav, open: (u) => opened.push(u) });
+  assert.equal(r.method, 'mailto');
+  assert.equal(shared, false);
+  assert.ok(opened[0].startsWith('mailto:' + encodeURIComponent('w+x@work.example') + '?subject=%5BTT%5D%202026-11-13%20batch%200001'));
+  const body = decodeURIComponent(opened[0].split('&body=')[1]);
+  assert.ok(body.includes('-----BEGIN TT CSV v1-----') && body.includes('-----END TT CSV v1-----'));
+  assert.ok(body.includes('entry_id,nickname,date'));
+  assert.equal(await store.getSetting('batch'), 1);
+  assert.equal(await store.getSetting('lastSentAt'), now.toISOString());
+});
+
+test('mailtoUrl encodes the address', () => {
+  assert.equal(mailtoUrl('a&b@c.d', { subject: 's', body: 'b' }), 'mailto:a%26b%40c.d?subject=s&body=b');
+});
+
+test('share: NotAllowedError falls back to mailto and persists', async () => {
+  const store = await ready();
+  const opened = [];
+  const nav = { canShare: () => true, share: async () => { throw Object.assign(new Error('n'), { name: 'NotAllowedError' }); } };
+  const r = await sendBatch(store, { today: '2026-11-13', now, nav, method: 'share', open: (u) => opened.push(u) });
+  assert.equal(r.ok, true);
+  assert.equal(r.method, 'mailto');
+  assert.equal(opened.length, 1);
+  assert.equal(await store.getSetting('batch'), 1);
+});
+
+test('share without file-share support uses mailto', async () => {
+  const store = await ready();
+  const opened = [];
+  const r = await sendBatch(store, { today: '2026-11-13', now, nav: { canShare: () => false, share: async () => {} }, method: 'share', open: (u) => opened.push(u) });
+  assert.equal(r.method, 'mailto');
+  assert.equal(opened.length, 1);
+});
+
+test('prepared send calls navigator.share synchronously (keeps user activation)', async () => {
+  const store = await ready();
+  const input = await loadSendInput(store);
+  const prep = prepareSend(input, { today: '2026-11-13', now });
+  assert.equal(prep.ok, true);
+  const calls = [];
+  const nav = { canShare: () => true, share: async (d) => { calls.push(d); } };
+  const p = deliver(store, prep, { method: 'share', nav });
+  assert.equal(calls.length, 1, 'share must be called before any await');
+  assert.equal(calls[0].files[0].name, 'tt-2026-11-13-0001.csv');
+  assert.ok(calls[0].title.startsWith('[TT] 2026-11-13 batch 0001'));
+  assert.equal((await p).method, 'share');
+  assert.equal(await store.getSetting('batch'), 1);
+});
+
+test('prepared mailto opens synchronously; no-email and blocked are reported by prepareSend', async () => {
+  const store = await ready();
+  const opened = [];
+  const p = deliver(store, prepareSend(await loadSendInput(store), { today: '2026-11-13', now }), { open: (u) => opened.push(u) });
+  assert.equal(opened.length, 1);
+  await p;
+  const empty = mk();
+  assert.deepEqual(prepareSend(await loadSendInput(empty), { today: '2026-11-13', now }), { ok: false, reason: 'no-email' });
+  const bl = await ready({ blockedWords: ['x'] });
+  assert.equal(prepareSend(await loadSendInput(bl), { today: '2026-11-13', now }).blocked.length, 1);
 });

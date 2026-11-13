@@ -128,3 +128,4 @@ table.grid td.sum { font-weight: 700; }
 .nick-row { display: flex; align-items: center; gap: 6px; padding: 6px 0; border-bottom: 1px solid var(--border); }
 .nick-row .nick-name { flex: 1; font-weight: 600; }
 .nick-row button { min-width: 44px; padding: 10px; }
+.share-row { display: flex; justify-content: flex-end; margin: 0 0 8px; }

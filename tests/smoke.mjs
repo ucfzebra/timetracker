@@ -256,8 +256,68 @@ const stubShare = (page) => page.evaluate(() => {
   Object.defineProperty(navigator, 'canShare', { configurable: true, value: () => true });
   Object.defineProperty(navigator, 'share', {
     configurable: true,
-    value: async (d) => { window.__shared.push({ name: d.files[0].name, text: d.text, title: d.title }); },
+    value: async (d) => { window.__shared.push({ name: d.files[0].name, text: d.text, title: d.title, body: await d.files[0].text() }); },
   });
+});
+const stubOpen = (page) => page.evaluate(async () => {
+  window.__opened = [];
+  const m = await import('./src/send.js');
+  m.io.open = (u) => { window.__opened.push(u); };
+});
+const unstubShare = (page) => page.evaluate(() => { delete navigator.canShare; delete navigator.share; });
+
+step('Stop on an 11 h timer opens Edit and leaves it running', async ({ page }) => {
+  await page.evaluate(async () => {
+    const { openIdbBackend } = await import('./src/store/idb.js');
+    const d = new Date(Date.now() - 11 * 3600e3), p = (n) => String(n).padStart(2, '0');
+    await (await openIdbBackend()).put('entries', {
+      entry_id: 'stale-1', nickname: 'Falcon', date: `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`,
+      start: `${p(d.getHours())}:${p(d.getMinutes())}`, end: '', duration_min: 0, task: 'long', description: '',
+      source: 'web', deleted: false, updated_at: new Date().toISOString(),
+    });
+  });
+  await goto(page, '#/week'); await goto(page, '#/today');
+  await page.waitForSelector('#stop');
+  await page.click('#stop');
+  await page.waitForSelector('#edit-note');
+  const note = await page.textContent('#edit-note');
+  if (!/running 11 h/.test(note)) throw new Error('note: ' + note);
+  const hash = await page.evaluate(() => location.hash);
+  if (hash !== '#/edit/stale-1') throw new Error('hash: ' + hash);
+  const e = await page.evaluate(async () => {
+    const { openIdbBackend } = await import('./src/store/idb.js');
+    return (await openIdbBackend()).get('entries', 'stale-1');
+  });
+  if (e.end !== '') throw new Error('timer was stopped: ' + e.end);
+  // Set the real end time through the screen; the timer is then stopped.
+  await page.fill('#end', await page.inputValue('#start'));
+  await page.click('#save');
+  await onToday(page);
+  if (await page.$('#running')) throw new Error('still running after setting end');
+});
+
+step('nickname matching the blocked list is refused', async ({ page }) => {
+  await goto(page, '#/settings');
+  await page.waitForSelector('#new-nick');
+  await page.fill('#new-nick', 'Orion');
+  await page.click('#add-nick');
+  await page.waitForFunction(() => /matches your blocked-word list/.test(document.getElementById('view').textContent));
+  const names = await page.$$eval('#nick-list .nick-name', (n) => n.map((x) => x.textContent));
+  if (names.includes('Orion')) throw new Error('added: ' + names);
+});
+
+step('strict mode refuses a timer start with a blocked word', async ({ page }) => {
+  await setSetting(page, 'strictGuard', true);
+  try {
+    await goto(page, '#/week'); await goto(page, '#/today');
+    await onToday(page);
+    await page.fill('#task', 'Orion sync');
+    await page.click('#start');
+    await page.waitForFunction(() => /blocked word list/.test(document.querySelector('#view .error[role=alert]')?.textContent || ''));
+    if (await page.$('#running')) throw new Error('timer started');
+  } finally {
+    await setSetting(page, 'strictGuard', false);
+  }
 });
 
 step('Settings page renders', async ({ page }) => {
@@ -272,6 +332,7 @@ step('Help page renders', async ({ page }) => {
   await page.waitForFunction(() => /Add to Home Screen/.test(document.getElementById('view').textContent));
   const t = await viewText(page);
   if (!t.includes('Win+H') || !t.includes('Run Immediately')) throw new Error('help text');
+  if (!t.includes('Always open Capture from the home-screen icon')) throw new Error('help lacks home-screen warning');
 });
 
 step('send without work email is refused with a hint', async ({ page }) => {
@@ -284,18 +345,43 @@ step('send without work email is refused with a hint', async ({ page }) => {
   if (!/work email/i.test(t)) throw new Error(t);
 });
 
-step('send shares tt-DATE-0001.csv with BEGIN marker', async ({ page }) => {
+step('Send (default) opens a mailto: link with encoded address and [TT] subject', async ({ page }) => {
   await setSetting(page, 'workEmail', 'work@example.com');
   await setSetting(page, 'blockedWords', []);
   await goto(page, '#/week'); await goto(page, '#/today');
   await onToday(page);
   await stubShare(page);
+  await stubOpen(page);
   await page.click('#send');
+  await page.waitForSelector('#send-ok');
+  const opened = await page.evaluate(() => window.__opened);
+  const shared = await page.evaluate(() => window.__shared.length);
+  if (opened.length !== 1 || shared !== 0) throw new Error(`opened ${opened.length}, shared ${shared}`);
+  const prefix = 'mailto:' + encodeURIComponent('work@example.com') + '?';
+  if (!opened[0].startsWith(prefix)) throw new Error('url: ' + opened[0].slice(0, 80));
+  if (!opened[0].includes('subject=%5BTT%5D')) throw new Error('subject: ' + opened[0].slice(0, 120));
+  if (!decodeURIComponent(opened[0]).includes('-----BEGIN TT CSV v1-----')) throw new Error('body lacks marker');
+});
+
+step('Share with attachment: cancel shows "Send cancelled", then shares tt-DATE-0002.csv', async ({ page }) => {
+  await page.evaluate(() => {
+    Object.defineProperty(navigator, 'canShare', { configurable: true, value: () => true });
+    Object.defineProperty(navigator, 'share', {
+      configurable: true, value: async () => { throw new DOMException('cancelled', 'AbortError'); },
+    });
+  });
+  await page.click('#share');
+  await page.waitForSelector('#send-cancel');
+  if ((await page.textContent('#send-cancel')) !== 'Send cancelled') throw new Error('cancel text');
+  await stubShare(page);
+  await stubOpen(page);
+  await page.click('#share');
   await page.waitForSelector('#send-ok');
   const shared = await page.evaluate(() => window.__shared);
   if (shared.length !== 1) throw new Error('shares: ' + shared.length);
-  if (!/^tt-\d{4}-\d{2}-\d{2}-0001\.csv$/.test(shared[0].name)) throw new Error('name: ' + shared[0].name);
+  if (!/^tt-\d{4}-\d{2}-\d{2}-0002\.csv$/.test(shared[0].name)) throw new Error('name: ' + shared[0].name);
   if (!shared[0].text.includes('BEGIN TT CSV v1')) throw new Error('body lacks marker');
+  if ((await page.evaluate(() => window.__opened.length)) !== 0) throw new Error('mailto opened too');
 });
 
 step('send with a blocked word is refused', async ({ page }) => {
@@ -303,10 +389,11 @@ step('send with a blocked word is refused', async ({ page }) => {
   await goto(page, '#/week'); await goto(page, '#/today');
   await onToday(page);
   await stubShare(page);
+  await stubOpen(page);
   await page.click('#send');
   await page.waitForSelector('#send-blocked a');
-  const shared = await page.evaluate(() => window.__shared.length);
-  if (shared !== 0) throw new Error('shared despite block');
+  const shared = await page.evaluate(() => window.__shared.length + window.__opened.length);
+  if (shared !== 0) throw new Error('sent despite block');
 });
 
 step('export, clear database, import restores entries', async ({ page }) => {
@@ -314,6 +401,15 @@ step('export, clear database, import restores entries', async ({ page }) => {
   if (before < 3) throw new Error('entries before: ' + before);
   await goto(page, '#/settings');
   await page.waitForSelector('#export');
+  // Share sheet path first: blocked words stay out of the file by default.
+  await stubShare(page);
+  await page.click('#export');
+  await page.waitForFunction(() => window.__shared.length === 1);
+  const sh = await page.evaluate(() => window.__shared[0]);
+  if (!/^capture-backup-\d{4}-\d{2}-\d{2}\.json$/.test(sh.name)) throw new Error('share name: ' + sh.name);
+  const parsed = JSON.parse(sh.body);
+  if ('blockedWords' in parsed.settings) throw new Error('blocked words leaked into backup');
+  await unstubShare(page);
   const [dl] = await Promise.all([page.waitForEvent('download'), page.click('#export')]);
   if (!/^capture-backup-\d{4}-\d{2}-\d{2}\.json$/.test(dl.suggestedFilename())) throw new Error('name: ' + dl.suggestedFilename());
   const path = join(tmpdir(), `capture-smoke-${Date.now()}.json`);
@@ -334,6 +430,8 @@ step('export, clear database, import restores entries', async ({ page }) => {
   await page.waitForFunction(() => /Imported/.test(document.getElementById('settings-msg').textContent));
   const after = await countEntries(page);
   if (after !== before) throw new Error(`entries ${before} -> ${after}`);
+  await page.waitForSelector('#nick-list [data-nick="Falcon"]');
+  if ((await page.inputValue('#import-file')) !== '') throw new Error('file input not reset');
 });
 
 async function main() {

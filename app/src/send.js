@@ -20,39 +20,68 @@ export function prepareBatch({ entries, settings, today, generatedAt }) {
   return { ok: true, batch, email, count: inWindow.length };
 }
 
-export async function sendBatch(store, { today, now = new Date(), nav = globalThis.navigator, open } = {}) {
-  const [workEmail, blockedWords, windowDays, batch] = await Promise.all([
+// Indirection for opening the mail link; tests and the smoke run replace io.open.
+export const io = { open: (u) => { location.href = u; } };
+
+export const mailtoUrl = (to, email) =>
+  `mailto:${encodeURIComponent(to)}?subject=${encodeURIComponent(email.subject)}&body=${encodeURIComponent(email.body)}`;
+
+// Everything async a send needs. The Today screen loads this while rendering so that the
+// tap handler can build the email and call navigator.share without awaiting first.
+export async function loadSendInput(store) {
+  const [workEmail, blockedWords, windowDays, batch, entries] = await Promise.all([
     store.getSetting('workEmail'), store.getSetting('blockedWords'),
     store.getSetting('windowDays'), store.getSetting('batch'),
+    store.entriesBetween('0000-01-01', '9999-12-31', { includeDeleted: true }),
   ]);
-  if (!workEmail || !String(workEmail).trim()) return { ok: false, reason: 'no-email' };
-  const to = String(workEmail).trim();
-  const entries = await store.entriesBetween('0000-01-01', '9999-12-31', { includeDeleted: true });
+  return { workEmail, blockedWords, windowDays, batch, entries };
+}
+
+// Synchronous: no-email / blocked checks and the finished email.
+export function prepareSend(input, { today, now = new Date() } = {}) {
+  const to = String(input.workEmail || '').trim();
+  if (!to) return { ok: false, reason: 'no-email' };
   const prep = prepareBatch({
-    entries, settings: { workEmail: to, blockedWords, windowDays, batch },
+    entries: input.entries,
+    settings: { workEmail: to, blockedWords: input.blockedWords, windowDays: input.windowDays, batch: input.batch },
     today: today ?? localDate(now), generatedAt: now.toISOString(),
   });
   if (!prep.ok) return { ok: false, blocked: prep.blocked };
-  const { email } = prep;
-  const persist = async () => {
-    await store.setSetting('batch', prep.batch);
-    await store.setSetting('lastSentAt', now.toISOString());
-  };
+  return { ...prep, to, now };
+}
 
+// method 'mailto' (default) opens the mail link; 'share' shares the CSV as a file when the
+// browser can, falling back to mailto when it cannot or refuses (NotAllowedError).
+// batch / lastSentAt are written only after the link opened or the share resolved.
+export function deliver(store, prep, { method = 'mailto', nav = globalThis.navigator, open } = {}) {
+  const { email } = prep;
+  const persist = async (how) => {
+    await store.setSetting('batch', prep.batch);
+    await store.setSetting('lastSentAt', prep.now.toISOString());
+    return { ok: true, method: how, count: prep.count };
+  };
+  const mail = () => {
+    (open || io.open)(mailtoUrl(prep.to, email));
+    return persist('mailto');
+  };
+  if (method !== 'share') return mail();
   const file = new File([email.csv], email.filename, { type: 'text/csv' });
-  const data = { files: [file], title: email.subject, text: email.body };
-  if (nav && typeof nav.canShare === 'function' && typeof nav.share === 'function' && nav.canShare({ files: [file] })) {
-    try {
-      await nav.share(data);
-    } catch (e) {
+  const canShare = nav && typeof nav.canShare === 'function' && typeof nav.share === 'function'
+    && nav.canShare({ files: [file] });
+  if (!canShare) return mail();
+  // nav.share is called synchronously here, inside the tap's user activation.
+  return nav.share({ files: [file], title: email.subject, text: email.body }).then(
+    () => persist('share'),
+    (e) => {
       if (e && e.name === 'AbortError') return { ok: false, reason: 'cancelled' };
+      if (e && e.name === 'NotAllowedError') return mail();
       throw e;
-    }
-    await persist();
-    return { ok: true, method: 'share', count: prep.count };
-  }
-  const url = `mailto:${to}?subject=${encodeURIComponent(email.subject)}&body=${encodeURIComponent(email.body)}`;
-  (open || ((u) => { location.href = u; }))(url);
-  await persist();
-  return { ok: true, method: 'mailto', count: prep.count };
+    },
+  );
+}
+
+export async function sendBatch(store, { today, now = new Date(), nav = globalThis.navigator, open, method = 'mailto' } = {}) {
+  const prep = prepareSend(await loadSendInput(store), { today, now });
+  if (!prep.ok) return prep;
+  return deliver(store, prep, { method, nav, open });
 }

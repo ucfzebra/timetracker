@@ -1,5 +1,6 @@
 import { parseHHMM, formatHHMM, durationMinutes, localDate } from '../core/time.js';
 import { uuid } from '../core/ids.js';
+import { findBlocked } from '../core/guard.js';
 
 const LIMITS = { nickname: 24, task: 60, description: 200 };
 const STALE_HOURS = 10;
@@ -159,6 +160,7 @@ export function createStore(backend, { now = () => new Date(), source = 'web' } 
     const t = typeof name === 'string' ? name.trim() : '';
     if (!t) throw new Error('nickname required');
     if (t.length > LIMITS.nickname) throw new RangeError(`nickname exceeds ${LIMITS.nickname} characters`);
+    if (findBlocked(t, await getSetting('blockedWords')).length) throw new Error('That nickname matches your blocked-word list');
     const lower = t.toLowerCase();
     if ((await activeRows()).some((n) => n.name.toLowerCase() === lower)) throw new Error(`nickname already exists: ${t}`);
     return t;

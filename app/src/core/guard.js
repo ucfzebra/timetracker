@@ -16,3 +16,9 @@ export function findBlocked(text, words) {
   }
   return hits;
 }
+
+// What a timer start should do with this text: proceed, ask first, or refuse (strict mode).
+export function guardDecision(text, words, strict) {
+  const hits = findBlocked(text, words);
+  return { hits, action: !hits.length ? 'ok' : strict ? 'refuse' : 'confirm' };
+}

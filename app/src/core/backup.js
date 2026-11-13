@@ -3,8 +3,11 @@ export const BACKUP_FORMAT = 'capture-backup';
 export const BACKUP_VERSION = 1;
 const IMPORTABLE_SETTINGS = ['blockedWords', 'workEmail', 'strictGuard', 'windowDays'];
 
-export function makeBackup({ entries, nicknames, settings }, exportedAt) {
-  return { format: BACKUP_FORMAT, version: BACKUP_VERSION, exportedAt, entries, nicknames, settings };
+// The blocked-word list is itself sensitive, so it stays out of the file unless asked for.
+export function makeBackup({ entries, nicknames, settings }, exportedAt, { includeBlocked = false } = {}) {
+  const out = { ...settings };
+  if (!includeBlocked) delete out.blockedWords;
+  return { format: BACKUP_FORMAT, version: BACKUP_VERSION, exportedAt, entries, nicknames, settings: out };
 }
 
 const LIM = { nickname: 24, task: 60, description: 200 };
@@ -76,5 +79,9 @@ export function mergeBackup(local, incoming) {
     const v = SETTING_CHECK[k](incoming.settings[k]);
     if (v === undefined) skipped++; else settings[k] = v;
   }
+  // Batch numbers must never go backwards, or the work side would see repeats.
+  const ib = incoming.settings.batch;
+  const lb = Number.isInteger(local.settings.batch) ? local.settings.batch : 0;
+  if (Number.isInteger(ib) && ib >= 0 && ib > lb) settings.batch = ib;
   return { entries, nicknames, settings, skipped };
 }

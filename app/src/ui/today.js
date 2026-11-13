@@ -2,11 +2,13 @@ import { h, hmm, prettyDate, busy } from './dom.js';
 import { parseQuickAdd } from '../core/quickadd.js';
 import { dayTotals } from '../core/summary.js';
 import { todayBanners } from '../core/banners.js';
-import { sendBatch } from '../send.js';
+import { loadSendInput, prepareSend, deliver } from '../send.js';
+import { guardDecision } from '../core/guard.js';
 import { localDate, weekStart, toTenths, formatTenths } from '../core/time.js';
 
 let tick = null;
 const dismissed = new Set(); // banner kinds dismissed for this session
+let flash = null; // one-shot message shown by the next Today render (e.g. after a send)
 
 function stopTick() {
   if (tick) clearInterval(tick);
@@ -50,7 +52,7 @@ export async function render(el, ctx) {
 
   const now = new Date();
   const today = localDate(now);
-  const [todays, run, stale, lastSentAt, weekAckFor, lastBackupAt, recent] = await Promise.all([
+  const [todays, run, stale, lastSentAt, weekAckFor, lastBackupAt, recent, sendInput] = await Promise.all([
     store.entriesBetween(today, today),
     store.running(),
     store.staleTimer(),
@@ -58,11 +60,33 @@ export async function render(el, ctx) {
     store.getSetting('weekAckFor'),
     store.getSetting('lastBackupAt'),
     store.entriesBetween('2000-01-01', '2999-12-31', { includeDeleted: true }),
+    loadSendInput(store),
   ]);
 
   const msg = h('p', { class: 'error', role: 'alert' });
   const fail = (e) => { msg.textContent = e.message || String(e); };
   const refresh = () => navigate('#/today');
+
+  // A timer left running > 10 h is never stopped silently: open Edit to set the real end.
+  const staleGuard = async () => {
+    const s = await store.staleTimer();
+    if (!s) return false;
+    try {
+      sessionStorage.setItem('capture.editNote', `This timer has been running ${Math.floor(s.hours)} h — set the real end time.`);
+    } catch { /* note is optional */ }
+    await navigate('#/edit/' + encodeURIComponent(s.entry.entry_id));
+    return true;
+  };
+  // Blocked words in a new timer's task/note: ask first, or refuse in strict mode.
+  const wordsOk = async (taskText, noteText) => {
+    const [words, strict] = await Promise.all([store.getSetting('blockedWords'), store.getSetting('strictGuard')]);
+    const d = guardDecision(`${taskText} ${noteText}`, words, strict);
+    if (d.action === 'ok') return true;
+    const quoted = d.hits.map((w) => `"${w}"`).join(', ');
+    const what = `${quoted} ${d.hits.length > 1 ? 'are' : 'is'} on your blocked word list.`;
+    if (d.action === 'refuse') throw new Error(`${what} Edit before starting.`);
+    return confirm(`${what} Start anyway?`);
+  };
 
   // ---- banners
   const banners = h('div', { id: 'banners' });
@@ -99,8 +123,21 @@ export async function render(el, ctx) {
   sel.addEventListener('change', loadTasks);
   loadTasks();
 
-  const act = (fn) => busy(async () => { msg.textContent = ''; try { await fn(); await refresh(); } catch (e) { fail(e); } });
-  const startBtn = h('button', { class: 'primary', id: 'start', onclick: act(() => store.startTimer(sel.value, task.value.trim(), note.value.trim())) }, '▶ Start timer');
+  // fn returns false when it navigated elsewhere or was cancelled (no refresh then).
+  const act = (fn) => busy(async () => {
+    msg.textContent = '';
+    try {
+      if ((await fn()) !== false) await refresh();
+    } catch (e) { fail(e); }
+  });
+  const startFromForm = async () => {
+    if (await staleGuard()) return false;
+    const t = task.value.trim(), d = note.value.trim();
+    if (!(await wordsOk(t, d))) return false;
+    await store.startTimer(sel.value, t, d);
+    return true;
+  };
+  const startBtn = h('button', { class: 'primary', id: 'start', onclick: act(startFromForm) }, '▶ Start timer');
   const manualBtn = h('button', {
     id: 'manual',
     onclick: () => {
@@ -119,8 +156,15 @@ export async function render(el, ctx) {
       h('div', {}, h('strong', {}, '● RUNNING '), run.nickname),
       h('div', { class: 'run-line' }, h('span', { id: 'run-task' }, run.task || '(no task)'), clock),
       h('div', { class: 'btn-row' },
-        h('button', { id: 'stop', class: 'primary', onclick: act(() => store.stopTimer()) }, '■ Stop'),
-        h('button', { id: 'switch', onclick: act(() => store.switchTimer(sel.value, task.value.trim(), note.value.trim())) }, '⇄ Switch')),
+        h('button', {
+          id: 'stop', class: 'primary',
+          onclick: act(async () => {
+            if (await staleGuard()) return false;
+            await store.stopTimer();
+            return true;
+          }),
+        }, '■ Stop'),
+        h('button', { id: 'switch', onclick: act(startFromForm) }, '⇄ Switch')),
     );
     // Each interval clears only itself, so a superseded render can never stop the
     // clock of the screen that replaced it.
@@ -153,11 +197,14 @@ export async function render(el, ctx) {
       if (p.action === 'stop') {
         if (!run) throw new Error('No timer is running.');
         if (!confirm(`Stop the timer on ${run.nickname}?`)) return;
+        if (await staleGuard()) return;
         await store.stopTimer();
         await refresh();
       } else if (p.action === 'start' || p.action === 'switch') {
         if (!p.nickname) throw new Error('Nickname not recognised. Say it first, e.g. "start Falcon design review".');
         if (!confirm(`${p.action === 'start' ? 'Start' : 'Switch to'} ${p.nickname}: ${p.task || '(no task)'}?`)) return;
+        if (await staleGuard()) return;
+        if (!(await wordsOk(p.task || '', p.description || ''))) return;
         await store.startTimer(p.nickname, p.task, p.description);
         await refresh();
       } else {
@@ -194,31 +241,43 @@ export async function render(el, ctx) {
   if (!sorted.length) list.append(h('p', { class: 'muted' }, 'Nothing logged today yet.'));
 
   const sendOut = h('div', { id: 'send-out', role: 'status' });
-  const sendBtn = h('button', { id: 'send', class: 'primary' }, '⇪ Send');
-  sendBtn.addEventListener('click', async () => {
-    if (sendBtn.disabled) return;
-    sendBtn.disabled = true;
+  if (flash) {
+    sendOut.append(h('p', { class: 'banner', id: flash.id }, flash.text));
+    flash = null;
+  }
+  // The email is built synchronously from data loaded during render, so navigator.share
+  // (or the mailto link) runs inside the tap's user activation.
+  const doSend = (method) => busy(async () => {
     sendOut.replaceChildren();
     try {
-      const r = await sendBatch(store, { today, now: new Date() });
-      if (r.ok) {
-        sendOut.append(h('p', { class: 'banner', id: 'send-ok' }, `Sent ${r.count} entries (${r.method}).`));
-      } else if (r.reason === 'no-email') {
+      const prep = prepareSend(sendInput, { today, now: new Date() });
+      if (prep.reason === 'no-email') {
         sendOut.append(h('p', { class: 'error', id: 'send-err' }, 'Set your work email in Settings'));
-      } else if (r.blocked) {
+        return;
+      }
+      if (prep.blocked) {
         sendOut.append(h('div', { class: 'warn', id: 'send-blocked' },
           h('p', {}, 'Blocked words found. Fix these entries, then send again:'),
-          r.blocked.map((e) => h('p', {}, h('a', { href: '#/edit/' + encodeURIComponent(e.entry_id) }, `${e.date} ${e.nickname}: ${e.task || e.description}`)))));
+          prep.blocked.map((e) => h('p', {}, h('a', { href: '#/edit/' + encodeURIComponent(e.entry_id) }, `${e.date} ${e.nickname}: ${e.task || e.description}`)))));
+        return;
+      }
+      const r = await deliver(store, prep, { method });
+      if (r.ok) {
+        flash = { id: 'send-ok', text: `Sent ${r.count} entries (${r.method === 'share' ? 'shared with attachment' : 'email'}).` };
+        await refresh(); // banners (last sent) refresh
+      } else if (r.reason === 'cancelled') {
+        sendOut.append(h('p', { class: 'muted', id: 'send-cancel' }, 'Send cancelled'));
       }
     } catch (e) {
       sendOut.append(h('p', { class: 'error', role: 'alert' }, e.message || String(e)));
-    } finally {
-      sendBtn.disabled = false;
     }
   });
+  const sendBtn = h('button', { id: 'send', class: 'primary', onclick: doSend('mailto') }, '⇪ Send');
+  const shareBtn = h('button', { id: 'share', onclick: doSend('share') }, 'Share with attachment');
 
   el.append(
     h('header', { class: 'top' }, h('h1', {}, prettyDate(today)), sendBtn),
+    h('div', { class: 'share-row' }, shareBtn),
     sendOut,
     banners,
     runCard,

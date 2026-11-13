@@ -29,6 +29,11 @@ export async function render(el, { store, navigate, params }) {
     return;
   }
   const pre = id ? null : takePrefill();
+  let noteText = null;
+  try {
+    noteText = sessionStorage.getItem('capture.editNote');
+    sessionStorage.removeItem('capture.editNote');
+  } catch { /* optional */ }
   const src = existing || pre || {};
   const wasRunning = !!(existing && existing.start && !existing.end);
   const nicks = await store.nicknames();
@@ -124,6 +129,7 @@ export async function render(el, { store, navigate, params }) {
       h('button', { id: 'back', onclick: () => navigate('#/today') }, '‹ Back'),
       h('h1', {}, existing ? 'Edit entry' : 'New entry'),
       existing ? h('button', { id: 'delete', class: 'danger', onclick: del }, 'Delete') : h('span')),
+    noteText && existing ? h('p', { class: 'banner', id: 'edit-note', role: 'status' }, noteText) : null,
     h('label', { for: 'nick' }, 'Nickname'), nick,
     h('label', { for: 'date' }, 'Date'), date,
     h('div', { class: 'modes', role: 'radiogroup', 'aria-label': 'Mode' }, radio('range', 'Start/Stop'), radio('dur', 'Duration')),

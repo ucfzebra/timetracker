@@ -155,3 +155,14 @@ test('a failing timer op does not jam the mutex', async () => {
   const e = await store.startTimer('Falcon', 'ok', '');
   assert.equal((await store.running()).entry_id, e.entry_id);
 });
+
+test('nicknames matching the blocked-word list are refused (add and rename)', async () => {
+  const { store } = setup();
+  await store.addNickname('Falcon');
+  await store.setSetting('blockedWords', ['Ori*']);
+  await assert.rejects(() => store.addNickname('Orion'), /That nickname matches your blocked-word list/);
+  await assert.rejects(() => store.renameNickname('Falcon', 'orion-2'), /That nickname matches your blocked-word list/);
+  assert.deepEqual(await store.nicknames(), ['Falcon']);
+  await store.addNickname('Heron');
+  assert.deepEqual(await store.nicknames(), ['Falcon', 'Heron']);
+});

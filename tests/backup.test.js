@@ -54,12 +54,32 @@ test('nicknames: added, active if either active, order kept', () => {
   assert.equal(by.Admin.sort_order, 2);
 });
 
-test('settings: only whitelisted keys, only when absent; batch never imported', () => {
+test('settings: only whitelisted keys, only when absent; batch takes the max', () => {
   const l = local({ settings: { workEmail: 'me@work' } });
   const r = mergeBackup(l, inc({ settings: {
     workEmail: 'other@work', blockedWords: ['Ori*'], strictGuard: true, windowDays: 10, batch: 99, lastSentAt: 'z',
   } }));
-  assert.deepEqual(r.settings, { blockedWords: ['Ori*'], strictGuard: true, windowDays: 10 });
+  assert.deepEqual(r.settings, { blockedWords: ['Ori*'], strictGuard: true, windowDays: 10, batch: 99 });
+});
+
+test('batch = max(local, incoming); invalid incoming batch ignored', () => {
+  assert.equal(mergeBackup(local({ settings: { batch: 7 } }), inc({ settings: { batch: 5 } })).settings.batch, undefined);
+  assert.equal(mergeBackup(local({ settings: { batch: 7 } }), inc({ settings: { batch: 12 } })).settings.batch, 12);
+  assert.equal(mergeBackup(local(), inc({ settings: { batch: 3 } })).settings.batch, 3);
+  for (const batch of [-1, 2.5, '9', null]) {
+    const r = mergeBackup(local({ settings: { batch: 1 } }), inc({ settings: { batch } }));
+    assert.equal(r.settings.batch, undefined, String(batch));
+  }
+});
+
+test('makeBackup leaves out blockedWords unless includeBlocked', () => {
+  const all = { entries: [], nicknames: [], settings: { blockedWords: ['Ori*'], workEmail: 'w@x.y' } };
+  const off = makeBackup(all, 'now');
+  assert.equal('blockedWords' in off.settings, false);
+  assert.equal(off.settings.workEmail, 'w@x.y');
+  assert.deepEqual(all.settings.blockedWords, ['Ori*'], 'input not mutated');
+  assert.deepEqual(makeBackup(all, 'now', { includeBlocked: true }).settings.blockedWords, ['Ori*']);
+  assert.equal(JSON.stringify(makeBackup(all, 'now')).includes('Ori'), false);
 });
 
 const good = (o = {}) => E('g', '2026-11-10T10:00:00.000Z', { start: '09:00', end: '10:00', duration_min: 60, task: 't', description: '', ...o });

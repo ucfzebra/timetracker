@@ -30,3 +30,10 @@ test('unicode-aware boundaries', () => {
   assert.deepEqual(findBlocked('über build', ['über']), ['über']);
   assert.deepEqual(findBlocked('xüber build', ['über']), []);
 });
+
+test('guardDecision: ok / confirm / refuse', async () => {
+  const { guardDecision } = await import('../app/src/core/guard.js');
+  assert.deepEqual(guardDecision('design review', ['Ori*'], false), { hits: [], action: 'ok' });
+  assert.deepEqual(guardDecision('Orion review', ['Ori*'], false), { hits: ['Ori*'], action: 'confirm' });
+  assert.deepEqual(guardDecision('notes about orion', ['Ori*'], true), { hits: ['Ori*'], action: 'refuse' });
+});
