@@ -510,6 +510,47 @@ out.
 
 ---
 
+## 10a. Daily timecard reminders (requested)
+
+The goal is to make sure the **official timecard** is filled in every day, not
+just that time got logged.
+
+**Work side (main nag): Power Automate + Ledger**
+- Ledger has a per-day **"Timecard submitted ✓"** checkbox (and a keyboard
+  shortcut). Ticking it is how nagging stops.
+- Ledger writes a tiny status file after every change to
+  `OneDrive/TT/status/<YYYY-MM-DD>.json`:
+  `{ "date", "logged_hours", "expected_hours", "unmapped_count", "open_timer", "submitted" }`.
+  It contains no project names, so it's safe even in a shared view.
+- A scheduled Power Automate flow (weekdays) reads that file and sends a
+  **Teams message to yourself** (or an Outlook email) **only if the day isn't
+  done**:
+  - **16:30** "Logged 6.4 of 8.0 h · 1 unmapped · timer still running on Falcon."
+  - **17:15** a second reminder if still not submitted.
+  - **09:00 next morning** "Yesterday's timecard isn't marked submitted."
+  - **Thursday/Friday afternoon** a weekly check: "Week total 30.4 h, Fri not
+    yet logged."
+- Times and expected hours are settings. Expected hours per weekday cover 9/80
+  or 4/10 schedules, and holidays or leave days can be marked "no reminder".
+- If the status file is missing (Ledger not opened that day), the flow still
+  sends the 16:30 reminder.
+- Inside Ledger: a banner on the Today screen when the day before isn't
+  submitted.
+
+**Phone side (no cloud, so no server push)**
+- iPhone home-screen web apps can only receive notifications through a push
+  server, and v1 has none. Instead:
+  - An **iOS Shortcuts personal automation** (weekdays 16:30, "Run
+    immediately") that shows a notification and opens Capture. The setup steps
+    ship in the app's Help page. *(Designer's call: zero infrastructure,
+    reliable.)*
+  - **In-app nag:** opening Capture after the reminder time with entries not yet
+    sent shows "N entries not sent. Send now?" at the top.
+- If real push notifications are wanted later, they come with the optional
+  cloud add-on (§7.3).
+
+---
+
 ## 11. Security & compliance notes
 
 - The phone never stores real names or charge numbers. The work side never sends

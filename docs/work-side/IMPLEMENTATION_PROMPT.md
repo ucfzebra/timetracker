@@ -261,6 +261,29 @@ Day total                         7.0  7.5  7.5  7.0   –    –    –    29.0
 Exact hours                       7.00 7.48 7.53 6.98               28.99
 ```
 
+## Daily timecard reminders (part of v1)
+
+- Add a per-day **"Timecard submitted"** checkbox in Ledger (Today and Summary
+  screens). This is what turns reminders off for that day.
+- Settings: expected hours per weekday (default Mon–Fri 8.0, others 0;
+  supports 9/80 and 4/10 schedules), dates with no reminder (holidays/leave), and
+  reminder times (default 16:30, 17:15, next-morning 09:00).
+- After every change, write `TT/status/<YYYY-MM-DD>.json` into the synced
+  OneDrive folder:
+  `{"date","logged_hours","expected_hours","unmapped_count","open_timer","submitted"}`.
+  It must contain **no project names or charge numbers**.
+- Show a Today-screen banner if any earlier workday in the last 7 days is
+  missing the "submitted" tick.
+- In Step 0, also write me step-by-step instructions for a scheduled Power
+  Automate flow that reads the status file at each reminder time and, **only if
+  not submitted** (or if the file is missing), posts a Teams chat message to me
+  (fallback: an Outlook email to myself) like:
+  `Timecard 11/13: 6.4 of 8.0 h logged · 1 unmapped · timer running`.
+  Plus a 09:00 "yesterday not submitted" check and a Friday 14:00 week-total
+  check.
+- Tests: status-file contents for a sample day; banner logic across a weekend
+  and a holiday.
+
 ## Storage and safety
 
 - Keep everything in one local data file (SQLite preferred) in a folder I
