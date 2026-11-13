@@ -39,28 +39,34 @@ function serve() {
 const STEPS = [];
 const step = (name, fn) => STEPS.push({ name, fn });
 
-step('no console errors on load', async ({ errors, page }) => {
-  await page.waitForTimeout(500);
-  if (errors.length) throw new Error(errors.join('\n'));
-});
+const PLACEHOLDER = "This screen isn't available yet.";
+const viewText = (page) => page.evaluate(() => document.getElementById('view').textContent);
 
-step('unbuilt screen shows placeholder', async ({ page }) => {
-  // Remove once Tasks 8-9 add ui/*.js; harmless if the screen exists.
-  await page.waitForFunction(() => document.getElementById('view').textContent.trim().length > 0);
+step('placeholder shown for unbuilt screen', async ({ page }) => {
+  // Remove/adjust once Tasks 8-9 add ui/*.js.
+  await page.waitForFunction((t) => document.getElementById('view').textContent.includes(t), PLACEHOLDER);
 });
 
 step('service worker registered', async ({ page }) => {
   await page.evaluate(() => navigator.serviceWorker.ready);
 });
 
-step('loads offline from cache', async ({ page, ctx, url }) => {
-  await page.evaluate(() => navigator.serviceWorker.ready);
-  await page.reload(); // now controlled by the SW
-  await page.waitForTimeout(300);
-  await ctx.setOffline(true);
-  await page.reload();
-  await page.waitForFunction(() => document.getElementById('view').textContent.trim().length > 0);
-  await ctx.setOffline(false);
+step('loads offline on first visit (fresh context, no warm reload)', async ({ browser, url }) => {
+  const ctx = await browser.newContext();
+  try {
+    const page = await ctx.newPage();
+    await page.goto(url);
+    await page.evaluate(() => navigator.serviceWorker.ready);
+    await page.waitForFunction(() => navigator.serviceWorker.controller, null, { timeout: 5000 });
+    await ctx.setOffline(true);
+    await page.reload();
+    await page.waitForFunction(() => document.getElementById('view').textContent.trim().length > 0);
+    const text = await viewText(page);
+    if (/failed to start/i.test(text)) throw new Error(text);
+    if (!text.includes(PLACEHOLDER)) throw new Error(`unexpected view text: ${text}`);
+  } finally {
+    await ctx.close();
+  }
 });
 
 step('idb backend round-trips each table', async ({ page }) => {
@@ -110,7 +116,8 @@ async function main() {
     await page.waitForSelector('#view');
     for (const s of STEPS) {
       try {
-        await s.fn({ page, errors, url, ctx });
+        await s.fn({ page, errors, url, ctx, browser });
+        if (errors.length) throw new Error('console errors: ' + errors.join(' | '));
         console.log(`  ok   ${s.name}`);
       } catch (e) {
         failed = true;
