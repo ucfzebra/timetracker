@@ -7,6 +7,29 @@ export function makeBackup({ entries, nicknames, settings }, exportedAt) {
   return { format: BACKUP_FORMAT, version: BACKUP_VERSION, exportedAt, entries, nicknames, settings };
 }
 
+const LIM = { nickname: 24, task: 60, description: 200 };
+const DATE = /^\d{4}-\d{2}-\d{2}$/;
+const HHMM = /^([01]\d|2[0-3]):[0-5]\d$/;
+const ISO = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?Z$/;
+const str = (v, max) => typeof v === 'string' && v.length <= max;
+
+function validEntry(e) {
+  return str(e.entry_id, 200) && e.entry_id !== ''
+    && typeof e.nickname === 'string' && e.nickname.trim() !== '' && e.nickname.length <= LIM.nickname
+    && str(e.task ?? '', LIM.task) && str(e.description ?? '', LIM.description)
+    && typeof e.date === 'string' && DATE.test(e.date) && !Number.isNaN(Date.parse(e.date))
+    && ['start', 'end'].every((k) => e[k] === undefined || e[k] === '' || (typeof e[k] === 'string' && HHMM.test(e[k])))
+    && Number.isInteger(e.duration_min) && e.duration_min >= 0
+    && typeof e.updated_at === 'string' && ISO.test(e.updated_at);
+}
+
+const SETTING_CHECK = {
+  blockedWords: (v) => (Array.isArray(v) && v.every((w) => typeof w === 'string') ? v : undefined),
+  strictGuard: (v) => (typeof v === 'boolean' ? v : undefined),
+  windowDays: (v) => (Number.isInteger(v) && v >= 7 && v <= 31 ? v : undefined),
+  workEmail: (v) => (typeof v === 'string' && (v === '' || /^[^\s@?&]+@[^\s@?&]+$/.test(v)) ? v : undefined),
+};
+
 const isTomb = (v) => v === true || v === 1 || v === '1' || v === 'true';
 
 // local: {entries, nicknames (rows incl. inactive), settings (object of stored keys)}
@@ -19,8 +42,9 @@ export function mergeBackup(local, incoming) {
 
   const have = new Map(local.entries.map((e) => [e.entry_id, e]));
   const entries = [];
+  let skipped = 0;
   for (const raw of incoming.entries) {
-    if (!raw || typeof raw.entry_id !== 'string' || !raw.entry_id) continue;
+    if (!raw || typeof raw !== 'object' || !validEntry(raw)) { skipped++; continue; }
     const e = { ...raw, deleted: isTomb(raw.deleted) };
     const cur = have.get(e.entry_id);
     if (!cur || String(e.updated_at ?? '') > String(cur.updated_at ?? '')) entries.push(e);
@@ -30,7 +54,7 @@ export function mergeBackup(local, incoming) {
   let next = local.nicknames.reduce((m, n) => Math.max(m, n.sort_order), -1) + 1;
   const nicknames = [];
   for (const n of incoming.nicknames) {
-    if (!n || typeof n.name !== 'string' || !n.name) continue;
+    if (!n || !str(n.name, LIM.nickname) || !n.name.trim()) { skipped++; continue; }
     const cur = rows.get(n.name);
     if (!cur) {
       nicknames.push({ name: n.name, active: !!n.active, sort_order: Number.isFinite(n.sort_order) ? n.sort_order : next++ });
@@ -41,7 +65,9 @@ export function mergeBackup(local, incoming) {
 
   const settings = {};
   for (const k of IMPORTABLE_SETTINGS) {
-    if (k in incoming.settings && !(k in local.settings)) settings[k] = incoming.settings[k];
+    if (!(k in incoming.settings) || k in local.settings) continue;
+    const v = SETTING_CHECK[k](incoming.settings[k]);
+    if (v === undefined) skipped++; else settings[k] = v;
   }
-  return { entries, nicknames, settings };
+  return { entries, nicknames, settings, skipped };
 }

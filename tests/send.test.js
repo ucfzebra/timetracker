@@ -46,6 +46,16 @@ test('blocked word in task or description blocks; tombstones and out-of-window i
   assert.equal(r2.ok, true);
 });
 
+test('tombstone with blocked word is sent with blank task and description', () => {
+  const s = { ...settings, blockedWords: ['Orion'] };
+  const t = E('tomb', '2026-11-12', { deleted: true, task: 'Orion secret', description: 'Orion note' });
+  const r = prepareBatch({ entries: [t], settings: s, ...args });
+  assert.equal(r.ok, true);
+  assert.ok(!r.email.csv.includes('Orion'));
+  assert.ok(!r.email.body.includes('Orion'));
+  assert.ok(r.email.csv.includes('tomb'));
+});
+
 function mk() {
   const store = createStore(createMemoryBackend(), { now: () => new Date(2026, 10, 13, 12, 0, 0) });
   return store;

@@ -14,7 +14,9 @@ export function prepareBatch({ entries, settings, today, generatedAt }) {
     && (findBlocked(e.task, words).length || findBlocked(e.description, words).length));
   if (blocked.length) return { ok: false, blocked };
   const batch = (settings.batch || 0) + 1;
-  const email = buildEmail(inWindow, { today, batch, windowDays, generatedAt, to: settings.workEmail, });
+  // Tombstones carry no text: the work side only needs entry_id + deleted.
+  const outgoing = inWindow.map((e) => (isTomb(e) ? { ...e, task: '', description: '' } : e));
+  const email = buildEmail(outgoing, { today, batch, windowDays, generatedAt, to: settings.workEmail, });
   return { ok: true, batch, email, count: inWindow.length };
 }
 

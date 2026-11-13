@@ -104,7 +104,7 @@ export async function render(el, { store, navigate }) {
     const merged = mergeBackup(local, data);
     await store.importRows(merged);
     file.value = '';
-    say(`Imported ${merged.entries.length} entries, ${merged.nicknames.length} nicknames.`);
+    say(`Imported ${merged.entries.length} entries, ${merged.nicknames.length} nicknames.${merged.skipped ? ` ${merged.skipped} rows skipped.` : ''}`);
   }));
   const importBtn = h('button', { id: 'import', onclick: () => file.click() }, 'Import backup');
 
