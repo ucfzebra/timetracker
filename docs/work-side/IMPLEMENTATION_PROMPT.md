@@ -127,9 +127,27 @@ Any entry whose nickname has no mapping valid on its date is **Unmapped**. Show
 unmapped entries prominently (count + hours) with a one-click "Map it". Never
 silently drop them from totals: list them in their own "UNMAPPED" row.
 
-## Desk entry
+## Desk entry: Ledger must work fully on its own
 
-The same fields as above. The project drop-down shows `Project name (nickname)`.
+The phone is **optional**. I must be able to run my whole timekeeping from
+Ledger alone, without ever using the phone. So Ledger needs its own complete
+capture features, not just a form:
+- A **Today** screen with a **running timer**: Start, Stop, and one-click
+  **Switch** (stop the current timer and start another). Only one timer runs at
+  a time. The timer is saved as an open entry (start time, no end) so it
+  survives closing Ledger or rebooting. Warn if a timer has been open for more
+  than 10 h.
+- Quick manual entry (start/stop or duration) and today's list with a running
+  total.
+- Task names auto-complete from recent tasks for the same project.
+- Projects are created and managed in Ledger. Every project still has a
+  nickname, because that is how phone entries match it, but I can create
+  work-only projects that I never use on the phone.
+- Show a small notice if a phone-sourced entry overlaps in time with a
+  work-sourced entry on the same day (a likely double entry). Never merge them
+  automatically.
+
+Field details: the same fields as above. The project drop-down shows `Project name (nickname)`.
 Supports start/stop **or** a plain duration, and computes `duration_min`. New
 entries get a new UUID and `source=work`. Editing or deleting is allowed for any
 entry. Deleting sets `deleted=1`. If a later import brings a newer `updated_at`

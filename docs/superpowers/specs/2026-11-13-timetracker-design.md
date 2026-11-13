@@ -253,7 +253,7 @@ the phone. Any nickname the work side hasn't seen yet shows up there as
 - The **Send** button builds the email (§7) and opens the iPhone share sheet /
   Mail with the work address, subject, body and CSV attachment filled in.
   **One tap to send.**
-- *(Open decision D1: fully automatic sending via a small cloud service. See §12.)*
+- **Decision (user):** one-tap sending. No cloud service in v1.
 
 ---
 
@@ -377,7 +377,14 @@ underneath (time, nickname → project, task, description).
 - The app checks every row (date format, `duration_min` ≥ 0, a nickname is
   present) and reports any bad rows without stopping the whole import.
 
-### 8.4 Desk entry
+### 8.4 Desk entry: Ledger works on its own
+**Decision (user):** Ledger must work fully without the phone. It has its own
+Today screen with a running timer (Start / Stop / Switch, saved so it survives a
+restart), manual entry, task auto-complete and project management. The phone is
+an optional extra way to capture time. Ledger flags phone and work entries that
+overlap in time on the same day as possible double entries, and never merges
+them automatically.
+
 The same fields as on the phone, but the drop-down shows **project name
 (nickname)**. Entries made here get `source=work` and a new UUID. These never
 travel back to the phone (one-way flow, by design).
@@ -463,7 +470,7 @@ out.
 
 | # | Decision | Default in this doc |
 |---|---|---|
-| D1 | Sending: **one-tap manual** (no cloud) vs **automatic scheduled email** via a small Cloudflare Worker that also stores nickname-only data | One-tap manual for v1, automatic as a later add-on |
+| D1 | Sending | **Decided: one tap from the phone.** Ledger also works fully on its own (§8.4). |
 | D2 | Rounding rule (per day per charge #, per entry, round-up only) | Per day per charge #, nearest 0.1, half-up |
 | D3 | Timekeeping week start (Mon or Sat) | Monday |
 | D4 | Work-side runtime (Python / Excel / HTML) | Builder checks the laptop and picks, in that order |
