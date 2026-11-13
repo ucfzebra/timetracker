@@ -267,7 +267,11 @@ Exact hours                       7.00 7.48 7.53 6.98               28.99
   screens). This is what turns reminders off for that day.
 - Settings: expected hours per weekday (**my schedule is 4/10: default
   Mon–Thu 10.0, Fri–Sun 0**; editable for other schedules), dates with no reminder (holidays/leave), and
-  reminder times (default 16:30, 17:15, next-morning 09:00).
+  reminder times (default 16:30, 17:15, 21:00), and **workday start time
+  (default 09:00)**. Official rule: each day's time is due **1.5 h after the
+  start of the next workday** (so with a 09:00 start, 10:30; Thursday's time is
+  due Monday 10:30). Next-morning nags fire at start, +30, +60 and +75 min, only
+  while the previous workday is not marked submitted.
 - After every change, write `TT/status/<YYYY-MM-DD>.json` into the synced
   OneDrive folder:
   `{"date","logged_hours","expected_hours","unmapped_count","open_timer","submitted",
@@ -280,7 +284,7 @@ Exact hours                       7.00 7.48 7.53 6.98               28.99
   not submitted** (or if the file is missing), posts a Teams chat message to me
   (fallback: an Outlook email to myself) like:
   `Timecard 11/13: 6.4 of 10.0 h logged · 1 unmapped · timer running`.
-  Plus a 09:00 "yesterday not submitted" check (Monday morning checks
+  Plus the next-morning deadline nags above (Monday morning checks
   Thursday) and a **Thursday 14:00** week-total check.
 - **Weekly final submission (critical requirement).** Add a per-week
   **"Week timecard submitted (final)"** checkbox, separate from the daily ones,

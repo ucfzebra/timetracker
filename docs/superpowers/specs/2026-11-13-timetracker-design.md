@@ -586,7 +586,11 @@ be entered no later than **1.5 h after the start of the next day worked**. So
 the *daily* reminders are not optional. They are the real compliance deadline.
 On a 4/10 schedule, Thursday's time is due 1.5 h into **Monday**. Ledger needs a
 **workday start time** setting, and the next-morning nag fires at start time,
-then every 30 min until the deadline.
+then every 30 min until the deadline. **User setting: start 09:00, so deadline 10:30.** Morning nags
+fire at 09:00, 09:30, 10:00 and a final 10:15 ("15 min left"), only if the
+previous workday isn't marked submitted. Because the start time is
+"optimistic", the evening reminders (16:30/17:15 plus a **21:00 last call**,
+Mon–Thu) are the main defence. The morning nags are the safety net.
 
 - If the status file is missing (Ledger not opened that day), the flow still
   sends the 16:30 reminder.
