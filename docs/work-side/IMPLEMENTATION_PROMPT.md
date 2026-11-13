@@ -265,8 +265,8 @@ Exact hours                       7.00 7.48 7.53 6.98               28.99
 
 - Add a per-day **"Timecard submitted"** checkbox in Ledger (Today and Summary
   screens). This is what turns reminders off for that day.
-- Settings: expected hours per weekday (default Mon–Fri 8.0, others 0;
-  supports 9/80 and 4/10 schedules), dates with no reminder (holidays/leave), and
+- Settings: expected hours per weekday (**my schedule is 4/10: default
+  Mon–Thu 10.0, Fri–Sun 0**; editable for other schedules), dates with no reminder (holidays/leave), and
   reminder times (default 16:30, 17:15, next-morning 09:00).
 - After every change, write `TT/status/<YYYY-MM-DD>.json` into the synced
   OneDrive folder:
@@ -278,9 +278,9 @@ Exact hours                       7.00 7.48 7.53 6.98               28.99
   Automate flow that reads the status file at each reminder time and, **only if
   not submitted** (or if the file is missing), posts a Teams chat message to me
   (fallback: an Outlook email to myself) like:
-  `Timecard 11/13: 6.4 of 8.0 h logged · 1 unmapped · timer running`.
-  Plus a 09:00 "yesterday not submitted" check and a Friday 14:00 week-total
-  check.
+  `Timecard 11/13: 6.4 of 10.0 h logged · 1 unmapped · timer running`.
+  Plus a 09:00 "yesterday not submitted" check (Monday morning checks
+  Thursday) and a **Thursday 14:00** week-total check.
 - Tests: status-file contents for a sample day; banner logic across a weekend
   and a holiday.
 

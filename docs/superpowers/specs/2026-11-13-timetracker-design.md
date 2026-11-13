@@ -525,13 +525,14 @@ just that time got logged.
 - A scheduled Power Automate flow (weekdays) reads that file and sends a
   **Teams message to yourself** (or an Outlook email) **only if the day isn't
   done**:
-  - **16:30** "Logged 6.4 of 8.0 h · 1 unmapped · timer still running on Falcon."
+  - **16:30** "Logged 6.4 of 10.0 h · 1 unmapped · timer still running on Falcon."
   - **17:15** a second reminder if still not submitted.
-  - **09:00 next morning** "Yesterday's timecard isn't marked submitted."
-  - **Thursday/Friday afternoon** a weekly check: "Week total 30.4 h, Fri not
-    yet logged."
-- Times and expected hours are settings. Expected hours per weekday cover 9/80
-  or 4/10 schedules, and holidays or leave days can be marked "no reminder".
+  - **09:00 next workday** "Thursday's timecard isn't marked submitted."
+    (Monday morning checks Thursday.)
+  - **Thursday afternoon** (last workday of a 4/10 week) a weekly check:
+    "Week total 30.4 of 40.0 h, Thu not yet submitted."
+- Times and expected hours are settings. **Schedule: 4/10, Mon–Thu, 10.0 h/day (user).**
+  Expected hours per weekday are a setting, and holidays or leave days can be marked "no reminder".
 - If the status file is missing (Ledger not opened that day), the flow still
   sends the 16:30 reminder.
 - Inside Ledger: a banner on the Today screen when the day before isn't
