@@ -270,7 +270,8 @@ Exact hours                       7.00 7.48 7.53 6.98               28.99
   reminder times (default 16:30, 17:15, next-morning 09:00).
 - After every change, write `TT/status/<YYYY-MM-DD>.json` into the synced
   OneDrive folder:
-  `{"date","logged_hours","expected_hours","unmapped_count","open_timer","submitted"}`.
+  `{"date","logged_hours","expected_hours","unmapped_count","open_timer","submitted",
+  "week_start","week_hours","week_expected","week_submitted"}`.
   It must contain **no project names or charge numbers**.
 - Show a Today-screen banner if any earlier workday in the last 7 days is
   missing the "submitted" tick.
@@ -281,6 +282,15 @@ Exact hours                       7.00 7.48 7.53 6.98               28.99
   `Timecard 11/13: 6.4 of 10.0 h logged · 1 unmapped · timer running`.
   Plus a 09:00 "yesterday not submitted" check (Monday morning checks
   Thursday) and a **Thursday 14:00** week-total check.
+- **Weekly final submission (critical requirement).** Add a per-week
+  **"Week timecard submitted (final)"** checkbox, separate from the daily ones,
+  prominent on the Summary and Today screens. Write instructions for a second
+  scheduled flow that, **until `week_submitted` is true**, escalates:
+  Thu 16:30/18:00/19:30/21:00 → Teams chat to me;
+  Fri–Sun 09:00/12:00/16:00/19:00 → Teams chat + high-importance Outlook email;
+  from Mon 07:30, every 2 h on workdays → Teams + email, flagged OVERDUE. Ledger
+  also shows a full-screen OVERDUE banner on launch until last week is ticked.
+  Never send anything to a non-work address.
 - Tests: status-file contents for a sample day; banner logic across a weekend
   and a holiday.
 

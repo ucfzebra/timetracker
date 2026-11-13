@@ -520,7 +520,7 @@ just that time got logged.
   shortcut). Ticking it is how nagging stops.
 - Ledger writes a tiny status file after every change to
   `OneDrive/TT/status/<YYYY-MM-DD>.json`:
-  `{ "date", "logged_hours", "expected_hours", "unmapped_count", "open_timer", "submitted" }`.
+  `{ "date", "logged_hours", "expected_hours", "unmapped_count", "open_timer", "submitted", "week_start", "week_hours", "week_expected", "week_submitted" }`.
   It contains no project names, so it's safe even in a shared view.
 - A scheduled Power Automate flow (weekdays) reads that file and sends a
   **Teams message to yourself** (or an Outlook email) **only if the day isn't
@@ -533,6 +533,20 @@ just that time got logged.
     "Week total 30.4 of 40.0 h, Thu not yet submitted."
 - Times and expected hours are settings. **Schedule: 4/10, Mon–Thu, 10.0 h/day (user).**
   Expected hours per weekday are a setting, and holidays or leave days can be marked "no reminder".
+- **Weekly final submission: major nagging (user requirement).** Separate
+  from the daily tick, Ledger has a per-week **"Week timecard submitted
+  (final) ✓"**. From **Thursday 16:30 until it is ticked**, the flow escalates:
+
+  | When | Channel | Tone |
+  |---|---|---|
+  | Thu 16:30, 18:00, 19:30, 21:00 | Teams chat to self | "Week timecard not submitted: 38.6 of 40.0 h" |
+  | Fri–Sun 09:00, 12:00, 16:00, 19:00 | Teams chat to self **+ high-importance Outlook email** | "⚠ WEEK TIMECARD STILL NOT SUBMITTED" |
+  | Mon 07:30 onward, every 2 h on workdays | Teams + email + Ledger full-screen banner | "OVERDUE: last week's timecard" |
+
+  It stops the moment the week is ticked. Weekend messages only reach the
+  user's phone if **Teams/Outlook mobile** (work-managed) is installed. That is
+  the recommended weekend channel. Forwarding to a personal email address is
+  *not* built in, because it usually breaks company policy.
 - If the status file is missing (Ledger not opened that day), the flow still
   sends the 16:30 reminder.
 - Inside Ledger: a banner on the Today screen when the day before isn't
@@ -544,7 +558,11 @@ just that time got logged.
   - An **iOS Shortcuts personal automation** (weekdays 16:30, "Run
     immediately") that shows a notification and opens Capture. The setup steps
     ship in the app's Help page. *(Designer's call: zero infrastructure,
-    reliable.)*
+    reliable.)* Ship two automations: **weekday 16:30** (daily) and
+    **Thu 19:00, Fri–Sun 10:00 and 18:00** (weekly). The phone can't know whether
+    the week was submitted (data only flows phone → work), so these fire
+    regardless. Capture shows a "Week submitted?" button that silences its
+    in-app banner until Monday.
   - **In-app nag:** opening Capture after the reminder time with entries not yet
     sent shows "N entries not sent. Send now?" at the top.
 - If real push notifications are wanted later, they come with the optional
@@ -573,8 +591,8 @@ just that time got logged.
 | # | Decision | Default in this doc |
 |---|---|---|
 | D1 | Sending | **Decided: one tap from the phone.** Ledger also works fully on its own (§8.4). |
-| D2 | Rounding rule (per day per charge #, per entry, round-up only) | Per day per charge #, nearest 0.1, half-up |
-| D3 | Timekeeping week start (Mon or Sat) | Monday |
+| D2 | Rounding rule | **Decided:** per day per charge #, nearest 0.1, half-up |
+| D3 | Week start | **Decided:** Monday. Workdays Mon–Thu (4/10). |
 | D4 | Work-side runtime (Python / Excel / HTML) | Builder checks the laptop and picks, in that order |
 
 ---
