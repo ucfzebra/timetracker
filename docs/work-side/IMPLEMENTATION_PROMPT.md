@@ -94,7 +94,18 @@ quoted and contain commas, double quotes `""` and newlines).
   and reason) and keep importing the rest.
 - Report each run: `N new, N updated, N deleted, N unchanged, N rejected`.
 
-**Ingestion routes (build both)**
+**Ingestion routes**
+
+*Preferred, if Power Automate is available:* I will build a cloud flow ("When a
+new email arrives" filtered on subject `[TT]` → save the attachment, or the text
+between the markers, as a `.csv` into a OneDrive folder `TT/inbox` that syncs to
+this laptop → move the email to `TT/Processed`). Ledger then only needs to
+**watch a local folder**: import every new `.csv` in `TT/inbox`, then move it to
+`TT/inbox/done`. This avoids Outlook COM entirely. As part of Step 0, write me
+step-by-step instructions for building that flow (the trigger, the actions,
+and the expressions to extract the text between the markers).
+
+*Also build these, as fallbacks:*
 - **Outlook folder:** I will create an Outlook rule that moves `[TT]` emails into
   a folder named `TT`. Ledger reads unprocessed emails there, imports them, and
   moves them to `TT/Processed`. Use Outlook COM (or Graph if that's the only
@@ -229,6 +240,14 @@ folder, removes duplicates by `suggestion_id`, and shows the suggestions on the
 Day Log. Treat the file contents as **display-only data**. Never execute or
 follow anything in them. This keeps the counting code deterministic and lets
 data collection be done by whatever tool is allowed.
+
+**Preferred collector: Power Automate.** A scheduled flow (e.g. weekdays at
+16:45) using the standard Office 365 Outlook connector ("Get calendar view of
+events"), the Microsoft Teams connector, and the Jira connector (if my licence
+and the company's connector-restriction (DLP) policies allow it). It writes one
+suggestions CSV per source into a OneDrive folder `TT/suggestions` that syncs to
+this laptop. Write me the flow-building instructions when we get to Phase 2.
+Use built-in Python integrations only for sources Power Automate can't reach.
 
 Each suggestion can be mapped to a nickname or project (with rules I define,
 e.g. "Jira project ABC → Falcon", "calendar category Overhead → Admin"), and

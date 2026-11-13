@@ -365,6 +365,11 @@ underneath (time, nickname → project, task, description).
   The app reads that folder (Outlook COM on Windows, or Microsoft Graph if
   allowed), takes the data between the `BEGIN/END` markers (or the attachment
   if the markers are missing), imports it, then moves the email to `TT/Processed`.
+- **Preferred if Power Automate is available:** a cloud flow triggered by a new
+  `[TT]` email saves the CSV into a OneDrive folder (`TT/inbox`) that syncs to
+  the laptop. Ledger just watches that local folder, so no Outlook automation
+  code is needed. Power Automate is already an approved, company-managed tool,
+  which avoids asking IT for access to Microsoft's APIs.
 - **Fallback:** the user saves the attachment, or pastes the email body, into
   the app.
 - Upsert rule: for each `entry_id`, keep the row with the newer `updated_at`.
@@ -426,6 +431,12 @@ A source can be a built-in integration, or an **external work-side agent**
 (e.g. the company's on-prem agent platform driving Outlook, Jira or Teams in a
 browser). The agent *gathers* information. Ledger's tested code does all the
 *counting*, so an AI model never does timesheet arithmetic.
+
+**Preferred collector: Power Automate.** A scheduled weekday flow using the
+Outlook (calendar), Teams and Jira connectors writes suggestion CSVs into a
+synced OneDrive folder. Caveats: the Jira connector may need a premium licence,
+and company connector-restriction (DLP) policies may block some combinations.
+Use a Genesis agent or Python code for whatever Power Automate can't reach.
 
 All Phase 2 data stays on the work laptop. Nothing from Phase 2 is ever emailed
 out.
