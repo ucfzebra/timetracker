@@ -77,6 +77,10 @@ export function createStore(backend, { now = () => new Date(), source = 'web' } 
     return e;
   }
 
+  async function getEntry(id) {
+    return (await backend.get('entries', id)) || null;
+  }
+
   async function deleteEntry(id) {
     const prev = await backend.get('entries', id);
     if (!prev) throw new Error(`no such entry: ${id}`);
@@ -195,7 +199,7 @@ export function createStore(backend, { now = () => new Date(), source = 'web' } 
   }
 
   return {
-    addEntry, updateEntry, deleteEntry, entriesBetween, running,
+    addEntry, updateEntry, deleteEntry, getEntry, entriesBetween, running,
     startTimer, stopTimer, switchTimer, staleTimer,
     nicknames, addNickname, renameNickname, archiveNickname,
     getSetting, setSetting, recentTasks,

@@ -117,3 +117,10 @@ test('editing description of a stopped 30 h entry keeps duration_min', async () 
   const v = await store.updateEntry(stopped.entry_id, { end: '10:00' });
   assert.equal(v.duration_min, 60);
 });
+
+test('getEntry returns the entry or null', async () => {
+  const { store } = setup();
+  const e = await store.addEntry(base);
+  assert.equal((await store.getEntry(e.entry_id)).task, 'Review');
+  assert.equal(await store.getEntry('nope'), null);
+});
