@@ -3,7 +3,7 @@ import { localDate, weekStart } from './time.js';
 
 const AFTER = 16 * 60 + 30; // 16:30 local
 
-export function todayBanners({ now, lastSentAt = null, weekAckFor = null, entries = [], stale = null }) {
+export function todayBanners({ now, lastSentAt = null, weekAckFor = null, entries = [], stale = null, lastBackupAt = null }) {
   const out = [];
   const today = localDate(now);
   const dow = now.getDay(); // 0 = Sunday
@@ -24,6 +24,12 @@ export function todayBanners({ now, lastSentAt = null, weekAckFor = null, entrie
 
   const weekWindow = (dow === 4 && late) || dow === 5 || dow === 6 || dow === 0;
   if (weekWindow && weekAckFor !== weekStart(today)) out.push({ kind: 'week', text: 'Submit your week timecard' });
+
+  const live = entries.some((e) => !e.deleted);
+  const WEEK_MS = 7 * 24 * 3600 * 1000;
+  if (live && (!lastBackupAt || now.getTime() - Date.parse(lastBackupAt) > WEEK_MS)) {
+    out.push({ kind: 'backup', text: 'No recent backup. Export one in Settings.' });
+  }
 
   return out;
 }

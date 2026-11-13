@@ -2,6 +2,7 @@ import { h, hmm, prettyDate } from './dom.js';
 import { parseQuickAdd } from '../core/quickadd.js';
 import { dayTotals } from '../core/summary.js';
 import { todayBanners } from '../core/banners.js';
+import { sendBatch } from '../send.js';
 import { localDate, weekStart, toTenths, formatTenths } from '../core/time.js';
 
 let tick = null;
@@ -49,12 +50,13 @@ export async function render(el, ctx) {
 
   const now = new Date();
   const today = localDate(now);
-  const [todays, run, stale, lastSentAt, weekAckFor, recent] = await Promise.all([
+  const [todays, run, stale, lastSentAt, weekAckFor, lastBackupAt, recent] = await Promise.all([
     store.entriesBetween(today, today),
     store.running(),
     store.staleTimer(),
     store.getSetting('lastSentAt'),
     store.getSetting('weekAckFor'),
+    store.getSetting('lastBackupAt'),
     store.entriesBetween('2000-01-01', '2999-12-31', { includeDeleted: true }),
   ]);
 
@@ -64,7 +66,7 @@ export async function render(el, ctx) {
 
   // ---- banners
   const banners = h('div', { id: 'banners' });
-  for (const b of todayBanners({ now, lastSentAt, weekAckFor, entries: recent, stale })) {
+  for (const b of todayBanners({ now, lastSentAt, weekAckFor, entries: recent, stale, lastBackupAt })) {
     if (dismissed.has(b.kind)) continue;
     const box = h('div', { class: 'banner banner-' + b.kind, role: 'status' }, h('span', { class: 'banner-text' }, b.text));
     if (b.kind === 'stale') {
@@ -76,6 +78,7 @@ export async function render(el, ctx) {
         onclick: async () => { await store.setSetting('weekAckFor', weekStart(today)); refresh(); },
       }, 'Week submitted ✓'));
     }
+    if (b.kind === 'backup') box.append(h('a', { href: '#/settings' }, 'Settings'));
     box.append(h('button', {
       class: 'banner-x', 'aria-label': 'Dismiss',
       onclick: () => { dismissed.add(b.kind); box.remove(); },
@@ -171,8 +174,33 @@ export async function render(el, ctx) {
   }
   if (!sorted.length) list.append(h('p', { class: 'muted' }, 'Nothing logged today yet.'));
 
+  const sendOut = h('div', { id: 'send-out', role: 'status' });
+  const sendBtn = h('button', { id: 'send', class: 'primary' }, '⇪ Send');
+  sendBtn.addEventListener('click', async () => {
+    if (sendBtn.disabled) return;
+    sendBtn.disabled = true;
+    sendOut.replaceChildren();
+    try {
+      const r = await sendBatch(store, { today, now: new Date() });
+      if (r.ok) {
+        sendOut.append(h('p', { class: 'banner', id: 'send-ok' }, `Sent ${r.count} entries (${r.method}).`));
+      } else if (r.reason === 'no-email') {
+        sendOut.append(h('p', { class: 'error', id: 'send-err' }, 'Set your work email in Settings'));
+      } else if (r.blocked) {
+        sendOut.append(h('div', { class: 'warn', id: 'send-blocked' },
+          h('p', {}, 'Blocked words found. Fix these entries, then send again:'),
+          r.blocked.map((e) => h('p', {}, h('a', { href: '#/edit/' + encodeURIComponent(e.entry_id) }, `${e.date} ${e.nickname}: ${e.task || e.description}`)))));
+      }
+    } catch (e) {
+      sendOut.append(h('p', { class: 'error', role: 'alert' }, e.message || String(e)));
+    } finally {
+      sendBtn.disabled = false;
+    }
+  });
+
   el.append(
-    h('header', { class: 'top' }, h('h1', {}, prettyDate(today))),
+    h('header', { class: 'top' }, h('h1', {}, prettyDate(today)), sendBtn),
+    sendOut,
     banners,
     runCard,
     h('div', { class: 'card' },

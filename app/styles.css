@@ -123,3 +123,7 @@ table.grid th:first-child, table.grid tbody th { text-align: left; font-weight: 
 table.grid thead th { color: var(--muted); font-weight: 600; border-bottom: 1px solid var(--border); }
 table.grid tr.total { border-top: 2px solid var(--border); font-weight: 700; }
 table.grid td.sum { font-weight: 700; }
+.top { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.nick-row { display: flex; align-items: center; gap: 6px; padding: 6px 0; border-bottom: 1px solid var(--border); }
+.nick-row .nick-name { flex: 1; font-weight: 600; }
+.nick-row button { min-width: 44px; padding: 10px; }

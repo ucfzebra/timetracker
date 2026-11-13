@@ -38,8 +38,8 @@ test('every module statically reachable from app.js is precached', () => {
   for (const m of routes.matchAll(/'(\.[^']+)'/g)) roots.push(join(APP, 'src', m[1]));
   const seen = new Set();
   for (const r of roots) {
-    // Screens that do not exist yet (settings/help before their task) are skipped.
-    if (existsSync(r)) reachable(r, seen);
+    assert.ok(existsSync(r), `ROUTES target missing: ${relative(APP, r)}`);
+    reachable(r, seen);
   }
   for (const abs of seen) {
     const rel = relative(APP, abs);

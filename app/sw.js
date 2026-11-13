@@ -1,11 +1,12 @@
 // Bump the version on every release; keep SHELL in step with app/ modules.
-const CACHE = 'capture-v2';
+const CACHE = 'capture-v3';
 const SHELL = [
   './', 'index.html', 'styles.css', 'manifest.webmanifest', 'src/app.js',
   'src/store/store.js', 'src/store/idb.js',
   'src/core/csv.js', 'src/core/guard.js', 'src/core/ids.js',
   'src/core/quickadd.js', 'src/core/summary.js', 'src/core/time.js', 'src/core/banners.js', 'src/core/patch.js',
   'src/ui/dom.js', 'src/ui/today.js', 'src/ui/edit.js', 'src/ui/week.js',
+  'src/send.js', 'src/core/backup.js', 'src/ui/settings.js', 'src/ui/help.js',
   'icons/icon-192.png', 'icons/icon-512.png', 'icons/apple-touch-icon.png',
 ];
 

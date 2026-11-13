@@ -5,6 +5,7 @@ import { extname, join, normalize } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
 import { execSync } from 'node:child_process';
+import { tmpdir } from 'node:os';
 
 async function loadPlaywright() {
   try { return await import('playwright'); } catch { /* fall through */ }
@@ -192,6 +193,100 @@ step('blocked word shows warning, Save anyway saves', async ({ page }) => {
   await onToday(page);
   const rows = await page.$$eval('#entries .etask', (r) => r.map((x) => x.textContent));
   if (!rows.includes('Orion planning')) throw new Error('rows: ' + rows);
+});
+
+const setSetting = (page, key, value) => page.evaluate(async ([k, v]) => {
+  const { openIdbBackend } = await import('./src/store/idb.js');
+  const { createStore } = await import('./src/store/store.js');
+  await createStore(await openIdbBackend()).setSetting(k, v);
+}, [key, value]);
+const countEntries = (page) => page.evaluate(async () => {
+  const { openIdbBackend } = await import('./src/store/idb.js');
+  return (await (await openIdbBackend()).all('entries')).length;
+});
+const stubShare = (page) => page.evaluate(() => {
+  window.__shared = [];
+  Object.defineProperty(navigator, 'canShare', { configurable: true, value: () => true });
+  Object.defineProperty(navigator, 'share', {
+    configurable: true,
+    value: async (d) => { window.__shared.push({ name: d.files[0].name, text: d.text, title: d.title }); },
+  });
+});
+
+step('Settings page renders', async ({ page }) => {
+  await goto(page, '#/settings');
+  await page.waitForSelector('#work-email');
+  const t = await viewText(page);
+  if (!t.includes('Falcon') || !t.includes('Ori*')) throw new Error('settings text: ' + t.slice(0, 200));
+});
+
+step('Help page renders', async ({ page }) => {
+  await goto(page, '#/help');
+  await page.waitForFunction(() => /Add to Home Screen/.test(document.getElementById('view').textContent));
+  const t = await viewText(page);
+  if (!t.includes('Win+H') || !t.includes('Run Immediately')) throw new Error('help text');
+});
+
+step('send without work email is refused with a hint', async ({ page }) => {
+  await goto(page, '#/today');
+  await onToday(page);
+  await stubShare(page);
+  await page.click('#send');
+  await page.waitForSelector('#send-err');
+  const t = await page.textContent('#send-err');
+  if (!/work email/i.test(t)) throw new Error(t);
+});
+
+step('send shares tt-DATE-0001.csv with BEGIN marker', async ({ page }) => {
+  await setSetting(page, 'workEmail', 'work@example.com');
+  await setSetting(page, 'blockedWords', []);
+  await goto(page, '#/week'); await goto(page, '#/today');
+  await onToday(page);
+  await stubShare(page);
+  await page.click('#send');
+  await page.waitForSelector('#send-ok');
+  const shared = await page.evaluate(() => window.__shared);
+  if (shared.length !== 1) throw new Error('shares: ' + shared.length);
+  if (!/^tt-\d{4}-\d{2}-\d{2}-0001\.csv$/.test(shared[0].name)) throw new Error('name: ' + shared[0].name);
+  if (!shared[0].text.includes('BEGIN TT CSV v1')) throw new Error('body lacks marker');
+});
+
+step('send with a blocked word is refused', async ({ page }) => {
+  await setSetting(page, 'blockedWords', ['Orion']);
+  await goto(page, '#/week'); await goto(page, '#/today');
+  await onToday(page);
+  await stubShare(page);
+  await page.click('#send');
+  await page.waitForSelector('#send-blocked a');
+  const shared = await page.evaluate(() => window.__shared.length);
+  if (shared !== 0) throw new Error('shared despite block');
+});
+
+step('export, clear database, import restores entries', async ({ page }) => {
+  const before = await countEntries(page);
+  if (before < 3) throw new Error('entries before: ' + before);
+  await goto(page, '#/settings');
+  await page.waitForSelector('#export');
+  const [dl] = await Promise.all([page.waitForEvent('download'), page.click('#export')]);
+  if (!/^capture-backup-\d{4}-\d{2}-\d{2}\.json$/.test(dl.suggestedFilename())) throw new Error('name: ' + dl.suggestedFilename());
+  const path = join(tmpdir(), `capture-smoke-${Date.now()}.json`);
+  await dl.saveAs(path);
+  await page.waitForFunction(() => /Backup exported/.test(document.getElementById('settings-msg').textContent));
+  await page.evaluate(() => new Promise((res, rej) => {
+    const o = indexedDB.open('capture');
+    o.onsuccess = () => {
+      const db = o.result;
+      const tx = db.transaction(['entries', 'nicknames', 'settings'], 'readwrite');
+      for (const n of ['entries', 'nicknames', 'settings']) tx.objectStore(n).clear();
+      tx.oncomplete = () => { db.close(); res(); };
+      tx.onerror = () => rej(tx.error);
+    };
+  }));
+  if ((await countEntries(page)) !== 0) throw new Error('db not cleared');
+  await page.setInputFiles('#import-file', path);
+  await page.waitForFunction(() => /Imported/.test(document.getElementById('settings-msg').textContent));
+  const after = await countEntries(page);
+  if (after !== before) throw new Error(`entries ${before} -> ${after}`);
 });
 
 async function main() {

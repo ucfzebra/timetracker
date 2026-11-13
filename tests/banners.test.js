@@ -5,7 +5,7 @@ import { todayBanners } from '../app/src/core/banners.js';
 const d = (day, h, m = 0) => new Date(2026, 10, day, h, m); // Nov 2026: 9 Mon, 11 Wed, 12 Thu, 13 Fri, 15 Sun, 16 Mon
 const entry = (date, updated_at) => ({ entry_id: 'x' + updated_at, date, updated_at, deleted: false });
 const kinds = (a) => a.map((b) => b.kind);
-const base = { lastSentAt: null, weekAckFor: null, entries: [], stale: null };
+const base = { lastSentAt: null, weekAckFor: null, entries: [], stale: null, lastBackupAt: '2026-11-10T12:00:00.000Z' };
 
 test('no banners on a quiet Wednesday morning', () => {
   assert.deepEqual(todayBanners({ ...base, now: d(11, 9) }), []);
@@ -68,4 +68,18 @@ test('stale timer banner comes first', () => {
   assert.deepEqual(kinds(b), ['stale']);
   assert.equal(b[0].text, 'Timer running 12 h on Falcon. Set end time?');
   assert.equal(b[0].entryId, 's');
+});
+
+test('backup banner: entries exist and lastBackupAt missing', () => {
+  const entries = [entry('2026-11-11', '2026-11-11T20:00:00.000Z')];
+  assert.deepEqual(kinds(todayBanners({ ...base, now: d(11, 9), entries, lastBackupAt: null })), ['backup']);
+});
+
+test('backup banner: older than 7 days shows, recent does not, no entries none', () => {
+  const entries = [entry('2026-11-11', '2026-11-11T20:00:00.000Z')];
+  const old = new Date(2026, 10, 3, 8).toISOString();
+  const recent = new Date(2026, 10, 6, 8).toISOString();
+  assert.deepEqual(kinds(todayBanners({ ...base, now: d(11, 9), entries, lastBackupAt: old })), ['backup']);
+  assert.deepEqual(kinds(todayBanners({ ...base, now: d(11, 9), entries, lastBackupAt: recent })), []);
+  assert.deepEqual(kinds(todayBanners({ ...base, now: d(11, 9), lastBackupAt: null })), []);
 });

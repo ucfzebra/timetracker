@@ -186,6 +186,21 @@ export function createStore(backend, { now = () => new Date(), source = 'web' } 
     await backend.put('settings', { key, value });
   }
 
+  // Raw access for backup export / import. Import merges are decided by core/backup.js.
+  async function exportAll() {
+    return {
+      entries: await backend.all('entries'),
+      nicknames: await backend.all('nicknames'),
+      settings: Object.fromEntries((await backend.all('settings')).map((r) => [r.key, r.value])),
+    };
+  }
+
+  async function importRows({ entries = [], nicknames = [], settings = {} }) {
+    for (const e of entries) await backend.put('entries', e);
+    for (const n of nicknames) await backend.put('nicknames', n);
+    for (const [key, value] of Object.entries(settings)) await backend.put('settings', { key, value });
+  }
+
   async function recentTasks(nickname, limit = 8) {
     const all = (await backend.all('entries'))
       .filter((e) => !e.deleted && e.nickname === nickname && e.task)
@@ -202,6 +217,6 @@ export function createStore(backend, { now = () => new Date(), source = 'web' } 
     addEntry, updateEntry, deleteEntry, getEntry, entriesBetween, running,
     startTimer, stopTimer, switchTimer, staleTimer,
     nicknames, addNickname, renameNickname, archiveNickname,
-    getSetting, setSetting, recentTasks,
+    getSetting, setSetting, recentTasks, exportAll, importRows,
   };
 }
