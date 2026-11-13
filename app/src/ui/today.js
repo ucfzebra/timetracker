@@ -122,10 +122,20 @@ export async function render(el, ctx) {
         h('button', { id: 'stop', class: 'primary', onclick: act(() => store.stopTimer()) }, '■ Stop'),
         h('button', { id: 'switch', onclick: act(() => store.switchTimer(sel.value, task.value.trim(), note.value.trim())) }, '⇄ Switch')),
     );
-    tick = setInterval(() => {
-      if (!el.isConnected || !clock.isConnected) return stopTick();
-      clock.textContent = elapsed(run);
-    }, 1000);
+    // Each interval clears only itself, so a superseded render can never stop the
+    // clock of the screen that replaced it.
+    const stale = () => (ctx.isCurrent ? !ctx.isCurrent() : !clock.isConnected);
+    if (!stale()) {
+      const id = setInterval(() => {
+        if (stale()) {
+          clearInterval(id);
+          if (tick === id) tick = null;
+          return;
+        }
+        clock.textContent = elapsed(run);
+      }, 1000);
+      tick = id;
+    }
   }
 
   // ---- quick add

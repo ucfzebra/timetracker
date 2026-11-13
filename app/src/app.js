@@ -20,7 +20,9 @@ function detectSource() {
 function parseHash(hash) {
   const parts = (hash || '').replace(/^#\/?/, '').split('/').filter(Boolean);
   const name = ROUTES[parts[0]] ? parts[0] : 'today';
-  return { name, params: { id: parts[1] ? decodeURIComponent(parts[1]) : undefined } };
+  let id;
+  try { id = parts[1] ? decodeURIComponent(parts[1]) : undefined; } catch { id = parts[1]; }
+  return { name, params: { id } };
 }
 
 async function boot() {
@@ -44,32 +46,58 @@ async function boot() {
     for (const r of w) r();
   };
 
+  let shownRoute = null; // route of the screen currently in #view
+
+  const message = (text, withReload) => {
+    const box = document.createElement('div');
+    const p = document.createElement('p');
+    p.className = withReload ? 'error' : 'muted';
+    p.textContent = text;
+    box.append(p);
+    if (withReload) {
+      const b = document.createElement('button');
+      b.textContent = 'Reload';
+      b.addEventListener('click', () => location.reload());
+      box.append(b);
+    }
+    return box;
+  };
+
   async function render() {
     const mine = ++token;
+    const isCurrent = () => mine === token;
     const { name, params } = parseHash(location.hash);
     for (const a of document.querySelectorAll('#nav a')) {
       a.classList.toggle('active', a.dataset.route === NAV_ACTIVE[name]);
     }
-    let mod;
     try {
-      mod = await import(ROUTES[name]);
-    } catch {
-      mod = null;
-    }
-    if (mine !== token) return;
-    view.replaceChildren();
-    if (!mod || typeof mod.render !== 'function') {
-      const p = document.createElement('p');
-      p.className = 'muted';
-      p.textContent = "This screen isn't available yet.";
-      view.append(p);
-      settle();
-      return;
-    }
-    try {
-      await mod.render(view, { store, navigate, params });
+      let mod = null;
+      try {
+        mod = await import(ROUTES[name]);
+      } catch (e) {
+        console.error('screen failed to load', e);
+      }
+      if (!isCurrent()) return;
+      let box;
+      if (!mod || typeof mod.render !== 'function') {
+        box = message("This screen isn't available yet.", false);
+      } else {
+        // Render off-screen; only the newest render is swapped in, so a slow earlier
+        // render can never append to (or replace) a newer screen.
+        box = document.createElement('div');
+        box.className = 'screen';
+        try {
+          await mod.render(box, { store, navigate, params, isCurrent, prev: shownRoute });
+        } catch (e) {
+          console.error(e);
+          box = message('Something went wrong: ' + (e && e.message ? e.message : String(e)), true);
+        }
+      }
+      if (!isCurrent()) return;
+      view.replaceChildren(box);
+      shownRoute = name;
     } finally {
-      if (mine === token) settle();
+      if (isCurrent()) settle();
     }
   }
 
@@ -78,6 +106,15 @@ async function boot() {
 }
 
 if ('serviceWorker' in navigator) {
+  // After a deploy the new worker takes over (skipWaiting + claim). Reload once so the page
+  // runs the new core and screen modules together. Not on first install (no controller yet).
+  const hadController = !!navigator.serviceWorker.controller;
+  let reloading = false;
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (!hadController || reloading) return;
+    reloading = true;
+    location.reload();
+  });
   addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch((e) => console.warn('sw failed', e)));
 }
 

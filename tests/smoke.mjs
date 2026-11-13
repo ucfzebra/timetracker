@@ -184,6 +184,39 @@ step('week shows Falcon row with today >= 2.8', async ({ page }) => {
   if (!/Last sent/.test(ls)) throw new Error(ls);
 });
 
+step('week arrows work; returning from another tab shows the current week', async ({ page }) => {
+  const title = () => page.textContent('.week-nav h1');
+  const current = await title();
+  await page.click('#prev');
+  await page.waitForFunction((t) => document.querySelector('.week-nav h1')?.textContent !== t, current);
+  await page.click('#nav a[data-route="today"]');
+  await onToday(page);
+  await page.click('#nav a[data-route="week"]');
+  await page.waitForSelector('#grid');
+  const back = await title();
+  if (back !== current) throw new Error(`expected ${current}, got ${back}`);
+});
+
+step('a screen that throws shows the error and a Reload button', async ({ page, errors }) => {
+  await page.evaluate(() => {
+    window.__getAll = IDBObjectStore.prototype.getAll;
+    IDBObjectStore.prototype.getAll = function () { throw new Error('boom'); };
+  });
+  try {
+    await goto(page, '#/week');
+    await page.click('#nav a[data-route="today"]');
+    await page.waitForFunction(() => /Something went wrong: boom/.test(document.getElementById('view').textContent));
+    const btn = await page.textContent('#view button');
+    if (btn !== 'Reload') throw new Error('button: ' + btn);
+  } finally {
+    await page.evaluate(() => { IDBObjectStore.prototype.getAll = window.__getAll; });
+  }
+  if (!errors.some((e) => /boom/.test(e))) throw new Error('error not logged');
+  errors.length = 0;
+  await goto(page, '#/week'); await goto(page, '#/today');
+  await onToday(page);
+});
+
 step('blocked word shows warning, Save anyway saves', async ({ page }) => {
   await page.evaluate(async () => {
     const { openIdbBackend } = await import('./src/store/idb.js');

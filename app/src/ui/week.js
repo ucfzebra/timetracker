@@ -13,7 +13,9 @@ function lastSent(iso) {
   return `Last sent: ${localDate(d)} ${p(d.getHours())}:${p(d.getMinutes())}`;
 }
 
-export async function render(el, { store, navigate }) {
+export async function render(el, { store, navigate, prev }) {
+  // Coming from another tab shows the current week; the arrows re-render from 'week'.
+  if (prev !== 'week') shown = null;
   const start = shown || weekStart(localDate(new Date()));
   const entries = await store.entriesBetween(start, addDays(start, 6));
   const g = weekGrid(entries, start);
