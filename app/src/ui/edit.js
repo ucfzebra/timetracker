@@ -1,5 +1,6 @@
 import { h, fmtDur } from './dom.js';
 import { findBlocked } from '../core/guard.js';
+import { buildPatch } from '../core/patch.js';
 import { parseHHMM, durationMinutes, localDate, toTenths, formatTenths } from '../core/time.js';
 
 // "45" or "90" = minutes, "1:30" = h:mm
@@ -86,7 +87,7 @@ export async function render(el, { store, navigate, params }) {
       if (parseHHMM(end.value) === null && !(wasRunning && !end.value)) throw new Error('Enter an end time.');
       times = { start: start.value, end: end.value };
     }
-    if (existing) await store.updateEntry(existing.entry_id, { ...base, ...times });
+    if (existing) await store.updateEntry(existing.entry_id, buildPatch(existing, { ...base, mode, start: '', end: '', duration_min: null, ...times }));
     else await store.addEntry({ ...base, ...times });
     navigate('#/today');
   }
