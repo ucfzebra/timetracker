@@ -1,5 +1,5 @@
 // Bump the version on every release; keep SHELL in step with app/ modules.
-const CACHE = 'capture-v4';
+const CACHE = 'capture-v5';
 const SHELL = [
   './', 'index.html', 'styles.css', 'manifest.webmanifest', 'src/app.js',
   'src/store/store.js', 'src/store/idb.js',

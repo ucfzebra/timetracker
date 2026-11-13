@@ -141,7 +141,7 @@ export async function render(el, { store, navigate }) {
     h('h1', {}, 'Settings'),
     note,
     h('h2', {}, 'Nicknames'),
-    hintEl, list, err,
+    hintEl || '', list, err,
     h('div', { class: 'btn-row' }, addInput, addBtn),
     h('h2', {}, 'Blocked words'),
     h('label', { for: 'blocked' }, 'One per line'),

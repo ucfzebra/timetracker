@@ -41,7 +41,18 @@ const STEPS = [];
 const step = (name, fn) => STEPS.push({ name, fn });
 
 const FIRST_RUN = 'Add your first nickname';
-const viewText = (page) => page.evaluate(() => document.getElementById('view').textContent);
+const viewText = async (page) => {
+  const [t, stray] = await page.evaluate(() => {
+    const view = document.getElementById('view');
+    // A text node that is exactly "null"/"undefined" means a screen appended an empty slot.
+    const w = document.createTreeWalker(view, NodeFilter.SHOW_TEXT);
+    let n, bad = null;
+    while ((n = w.nextNode())) if (/^\s*(null|undefined)\s*$/.test(n.data)) { bad = n.parentElement.outerHTML.slice(0, 160); break; }
+    return [view.textContent, bad];
+  });
+  if (stray) throw new Error('view shows null/undefined text: ' + stray);
+  return t;
+};
 const today = () => {
   const d = new Date(), p = (n) => String(n).padStart(2, '0');
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
