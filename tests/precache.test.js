@@ -56,3 +56,15 @@ test('multi-line and side-effect imports are followed', () => {
   const got = [...reachable(join(dir, 'a.js'))].map((f) => relative(dir, f)).sort();
   assert.deepEqual(got, ['a.js', 'b.js', 'c.js']);
 });
+
+test('every local asset referenced by index.html and styles.css is precached', () => {
+  const listed = new Set(shell);
+  const html = readFileSync(join(APP, 'index.html'), 'utf8');
+  const css = readFileSync(join(APP, 'styles.css'), 'utf8');
+  const refs = [
+    ...[...html.matchAll(/\b(?:src|href)="([^"#:]+)"/g)].map((m) => m[1]),
+    ...[...css.matchAll(/url\("?([^")]+)"?\)/g)].map((m) => m[1]),
+  ];
+  assert.ok(refs.some((r) => r.endsWith('.woff2')), 'fonts referenced');
+  for (const r of refs) assert.ok(listed.has(r), `not precached: ${r}`);
+});
