@@ -306,10 +306,9 @@ with a 🎤 button. You speak or type one sentence and the app fills in the form
 ### 6.7 Visual design (Shop Clock)
 
 The phone app is named **Shop Clock** and uses the owner's personal design system
-(brand tokens: Day Shop light theme by default, Night Shop dark theme under
-`prefers-color-scheme: dark`). The 6.2 mock-ups still describe the flows; this section
-describes the look.
-Dark (Night Shop) is the default; the Appearance setting offers Light and Match phone.
+(brand tokens: Night Shop dark theme by default; Settings → Appearance offers Day Shop
+light and "Match phone", which follows `prefers-color-scheme`). The 6.2 mock-ups still
+describe the flows; this section describes the look.
 
 - **Paper, not glass.** Flat parchment surfaces (`surface-100` page, `surface-200` cards),
   hairline `border` outlines, only `shadow-sm` / `shadow-md`, no gradients or blur.
@@ -322,8 +321,9 @@ Dark (Night Shop) is the default; the Appearance setting offers Light and Match 
 - **Type** (self-hosted woff2, latin subset, OFL-1.1, precached for offline use):
   Space Grotesk 600 for the wordmark and page titles, Inter 400/600 for UI text,
   IBM Plex Mono 500 for every number (hours, times, durations, the running clock).
-- **Tokens only.** Hex values live once in `:root` and once in the dark media query of
-  `app/styles.css`; `tests/contrast.test.js` checks every text/background pair the
+- **Tokens only.** Hex values live once per theme in `app/styles.css` (Night Shop on
+  `:root`/`[data-theme="dark"]`, Day Shop on `[data-theme="light"]` and on
+  `[data-theme="auto"]` under `prefers-color-scheme: light`); `tests/contrast.test.js` checks every text/background pair the
   stylesheet uses is at least 4.5:1 in both themes. Accent text on surfaces is below
   4.5:1 in Day Shop, so accent is never used for text on a surface: the active nav item is
   ink with a 3 px accent bar.
