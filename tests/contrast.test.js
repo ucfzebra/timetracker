@@ -11,11 +11,13 @@ function vars(block) {
 }
 
 export function themes(src) {
-  const light = src.match(/^:root\s*\{([^}]*)\}/m);
-  const dark = src.match(/@media\s*\(prefers-color-scheme:\s*dark\)\s*\{\s*:root\s*\{([^}]*)\}/);
-  assert.ok(light, 'light :root block');
-  assert.ok(dark, 'dark :root block');
-  return { light: vars(light[1]), dark: vars(dark[1]) };
+  const dark = src.match(/^:root,\s*:root\[data-theme="dark"\]\s*\{([^}]*)\}/m);
+  const light = src.match(/^:root\[data-theme="light"\]\s*\{([^}]*)\}/m);
+  const auto = src.match(/@media\s*\(prefers-color-scheme:\s*light\)\s*\{\s*:root\[data-theme="auto"\]\s*\{([^}]*)\}/);
+  assert.ok(dark, 'dark (default) block');
+  assert.ok(light, 'light block');
+  assert.ok(auto, 'auto-light block');
+  return { light: vars(light[1]), dark: vars(dark[1]), 'auto (light)': vars(auto[1]) };
 }
 
 function lum(hex) {
@@ -58,3 +60,8 @@ for (const [name, t] of Object.entries(themes(css))) {
     });
   }
 }
+
+test('auto-light tokens equal the light theme tokens', () => {
+  const t = themes(css);
+  assert.deepEqual(t['auto (light)'], t.light);
+});

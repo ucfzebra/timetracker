@@ -1,7 +1,7 @@
 // Pure backup build / merge logic. No I/O.
 export const BACKUP_FORMAT = 'capture-backup';
 export const BACKUP_VERSION = 1;
-const IMPORTABLE_SETTINGS = ['blockedWords', 'workEmail', 'strictGuard', 'windowDays'];
+const IMPORTABLE_SETTINGS = ['blockedWords', 'workEmail', 'strictGuard', 'windowDays', 'theme'];
 
 // The blocked-word list is itself sensitive, so it stays out of the file unless asked for.
 export function makeBackup({ entries, nicknames, settings }, exportedAt, { includeBlocked = false } = {}) {
@@ -31,6 +31,7 @@ const SETTING_CHECK = {
   blockedWords: (v) => (Array.isArray(v) && v.every((w) => typeof w === 'string') ? v : undefined),
   strictGuard: (v) => (typeof v === 'boolean' ? v : undefined),
   windowDays: (v) => (Number.isInteger(v) && v >= 7 && v <= 31 ? v : undefined),
+  theme: (v) => (v === 'dark' || v === 'light' || v === 'auto' ? v : undefined),
   workEmail: (v) => (typeof v === 'string' && (v === '' || /^[^\s@?&]+@[^\s@?&]+$/.test(v)) ? v : undefined),
 };
 

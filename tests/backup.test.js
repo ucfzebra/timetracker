@@ -139,3 +139,14 @@ test('mixed-precision timestamps: truly newer row wins', () => {
   const l2 = local({ entries: [good({ updated_at: '2026-11-10T10:00:00Z', task: 'local' })] });
   assert.equal(mergeBackup(l2, inc({ entries: [good({ updated_at: '2026-11-10T10:00:00.500Z', task: 'newer' })] })).entries[0].task, 'newer');
 });
+
+test('theme setting: dark|light|auto imported when absent, anything else skipped', () => {
+  for (const t of ['dark', 'light', 'auto']) {
+    assert.deepEqual(mergeBackup(local(), inc({ settings: { theme: t } })).settings, { theme: t });
+  }
+  const bad = mergeBackup(local(), inc({ settings: { theme: 'neon' } }));
+  assert.deepEqual(bad.settings, {});
+  assert.equal(bad.skipped, 1);
+  assert.deepEqual(mergeBackup(local({ settings: { theme: 'light' } }), inc({ settings: { theme: 'dark' } })).settings, {});
+  assert.equal(makeBackup({ entries: [], nicknames: [], settings: { theme: 'auto' } }, 'x').settings.theme, 'auto');
+});

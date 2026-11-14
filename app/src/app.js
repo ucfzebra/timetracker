@@ -2,6 +2,7 @@ import { createStore } from './store/store.js';
 import { openIdbBackend } from './store/idb.js';
 import { prettyDate } from './ui/dom.js';
 import { localDate } from './core/time.js';
+import { applyTheme, readLocalTheme } from './ui/theme.js';
 
 const ROUTES = {
   today: './ui/today.js',
@@ -30,6 +31,11 @@ function parseHash(hash) {
 async function boot() {
   try { await navigator.storage?.persist?.(); } catch { /* best effort */ }
   const store = createStore(await openIdbBackend(), { source: detectSource() });
+  // Restore the saved theme after a storage wipe + backup import (localStorage is lost first).
+  try {
+    const saved = await store.getSetting('theme');
+    if (['dark', 'light', 'auto'].includes(saved) && saved !== readLocalTheme()) applyTheme(saved);
+  } catch { /* theme is optional */ }
   const view = document.getElementById('view');
   let token = 0;
   let waiters = [];

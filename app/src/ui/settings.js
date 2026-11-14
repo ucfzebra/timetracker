@@ -1,6 +1,7 @@
 import { h, busy } from './dom.js';
 import { makeBackup, mergeBackup } from '../core/backup.js';
 import { localDate } from '../core/time.js';
+import { applyTheme, readLocalTheme } from './theme.js';
 
 export async function render(el, { store, navigate }) {
   const note = h('p', { id: 'settings-msg', class: 'muted', role: 'status' });
@@ -81,6 +82,24 @@ export async function render(el, { store, navigate }) {
     say('Saved.');
   });
 
+  // ---- appearance
+  const cur = document.documentElement.dataset.theme || readLocalTheme() || 'dark';
+  const themeRadio = (value, label) => {
+    const input = h('input', { type: 'radio', name: 'theme', value, id: 'theme-' + value });
+    input.checked = cur === value;
+    input.addEventListener('change', async () => {
+      if (!input.checked) return;
+      applyTheme(value);
+      await store.setSetting('theme', value);
+      say('Saved.');
+    });
+    return h('label', { class: 'radio', for: 'theme-' + value }, input, label);
+  };
+  const appearance = h('div', { id: 'appearance', role: 'radiogroup', 'aria-label': 'Appearance' },
+    themeRadio('dark', 'Dark (Night Shop)'),
+    themeRadio('light', 'Light (Day Shop)'),
+    themeRadio('auto', 'Match phone'));
+
   // ---- backup
   const inclBlocked = h('input', { id: 'backup-blocked', type: 'checkbox' });
   inclBlocked.checked = !!(await store.getSetting('backupIncludeBlocked', false));
@@ -140,6 +159,8 @@ export async function render(el, { store, navigate }) {
   el.append(
     h('h1', {}, 'Settings'),
     note,
+    h('h2', {}, 'Appearance'),
+    appearance,
     h('h2', {}, 'Project nicknames'),
     hintEl || '', list, err,
     h('div', { class: 'btn-row' }, addInput, addBtn),

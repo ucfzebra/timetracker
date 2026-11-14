@@ -309,6 +309,7 @@ The phone app is named **Shop Clock** and uses the owner's personal design syste
 (brand tokens: Day Shop light theme by default, Night Shop dark theme under
 `prefers-color-scheme: dark`). The 6.2 mock-ups still describe the flows; this section
 describes the look.
+Dark (Night Shop) is the default; the Appearance setting offers Light and Match phone.
 
 - **Paper, not glass.** Flat parchment surfaces (`surface-100` page, `surface-200` cards),
   hairline `border` outlines, only `shadow-sm` / `shadow-md`, no gradients or blur.

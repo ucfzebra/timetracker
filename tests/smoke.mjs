@@ -523,6 +523,45 @@ step('brand fonts load from the app itself; no request leaves the origin', async
   if (!requests.length) throw new Error('no requests recorded');
 });
 
+step('theme: dark by default, Light persists, Match phone follows the phone', async ({ browser, url, device }) => {
+  const bg = (page) => page.evaluate(() => getComputedStyle(document.body).backgroundColor);
+  const theme = (page) => page.evaluate(() => document.documentElement.dataset.theme);
+  const DARK = 'rgb(23, 20, 15)', LIGHT = 'rgb(247, 243, 236)';
+  // Default is dark even when the phone itself is light.
+  const ctx = await browser.newContext({ ...device, colorScheme: 'light' });
+  try {
+    const page = await ctx.newPage();
+    await page.goto(url);
+    await page.waitForSelector('#view');
+    if ((await theme(page)) !== 'dark') throw new Error('default theme: ' + (await theme(page)));
+    if ((await bg(page)) !== DARK) throw new Error('default background: ' + (await bg(page)));
+    await page.goto(url + '#/settings');
+    await page.waitForSelector('#theme-light');
+    await page.check('#theme-light');
+    await page.waitForFunction(() => document.body && getComputedStyle(document.body).backgroundColor === 'rgb(247, 243, 236)');
+    if ((await page.getAttribute('meta[name="theme-color"]', 'content')) !== '#f7f3ec') throw new Error('theme-color meta');
+    await page.reload();
+    await page.waitForSelector('#theme-light');
+    if ((await theme(page)) !== 'light' || (await bg(page)) !== LIGHT) throw new Error('light did not persist');
+    if (!(await page.isChecked('#theme-light'))) throw new Error('light radio not checked after reload');
+    // Match phone: light phone -> light, dark phone -> dark.
+    await page.check('#theme-auto');
+    await page.waitForFunction(() => document.documentElement.dataset.theme === 'auto');
+    await page.emulateMedia({ colorScheme: 'light' });
+    if ((await bg(page)) !== LIGHT) throw new Error('auto + light phone: ' + (await bg(page)));
+    await page.emulateMedia({ colorScheme: 'dark' });
+    if ((await bg(page)) !== DARK) throw new Error('auto + dark phone: ' + (await bg(page)));
+    // Wiped localStorage is restored from the stored setting on boot.
+    await page.check('#theme-light');
+    await page.waitForFunction(async () => { const { openIdbBackend } = await import('./src/store/idb.js'); const r = await (await openIdbBackend()).get('settings', 'theme'); return r && r.value === 'light'; });
+    await page.evaluate(() => localStorage.removeItem('shopclock.theme'));
+    await page.reload();
+    await page.waitForFunction(() => document.documentElement.dataset.theme === 'light');
+  } finally {
+    await ctx.close();
+  }
+});
+
 async function main() {
   const pw = await loadPlaywright();
   const chromium = pw.chromium ?? pw.default.chromium;
