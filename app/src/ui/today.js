@@ -9,7 +9,6 @@ import { localDate, weekStart, addDays, toTenths, formatTenths } from '../core/t
 let tick = null;
 const dismissed = new Set(); // banner kinds dismissed for this session
 let flash = null; // one-shot message shown by the next Today render (e.g. after a send)
-let pickNick = null; // project nickname just added inline; preselected by the next render
 
 function stopTick() {
   if (tick) clearInterval(tick);
@@ -139,8 +138,6 @@ export async function render(el, ctx) {
   // ---- timer fields
   const sel = h('select', { id: 'nick' }, nicks.map((n) => h('option', { value: n }, n)));
   if (run && nicks.includes(run.nickname)) sel.value = run.nickname;
-  else if (pickNick && nicks.includes(pickNick)) sel.value = pickNick;
-  pickNick = null;
   const task = h('input', { id: 'task', type: 'text', maxlength: 60, list: 'tasks', placeholder: 'What are you working on?', autocomplete: 'off' });
   const note = h('input', { id: 'note', type: 'text', maxlength: 200, placeholder: 'Optional note', autocomplete: 'off' });
   const tasks = h('datalist', { id: 'tasks' });
@@ -225,7 +222,7 @@ export async function render(el, ctx) {
   }
 
   // ---- quick add
-  const quick = h('input', { id: 'quick', class: 'quick', type: 'text', placeholder: 'Quick add — e.g. Falcon review 9 to 11:45 (tap 🎤 to dictate)', autocomplete: 'off', enterkeyhint: 'go', 'aria-label': 'Quick add' });
+  const quick = h('input', { id: 'quick', class: 'quick', type: 'text', placeholder: 'Quick add: Falcon review 9 to 11:45', autocomplete: 'off', enterkeyhint: 'go', 'aria-label': 'Quick add', 'aria-describedby': 'quick-hint' });
   let quickBusy = false;
   const quickGo = async () => {
     if (quickBusy) return;
@@ -279,8 +276,16 @@ export async function render(el, ctx) {
     projErr.textContent = '';
     try {
       const row = await store.addNickname(projInput.value);
-      pickNick = row.name;
-      await refresh();
+      // No re-render: keep whatever is typed in Task/Note and any revealed fields.
+      if (!nicks.includes(row.name)) {
+        nicks.push(row.name);
+        sel.append(h('option', { value: row.name }, row.name));
+      }
+      sel.value = row.name;
+      loadTasks();
+      projInput.value = '';
+      projForm.hidden = true;
+      projectBtn.setAttribute('aria-expanded', 'false');
     } catch (e) {
       projErr.textContent = e.message || String(e);
     }
@@ -360,6 +365,7 @@ export async function render(el, ctx) {
     timerCard,
     h('section', { class: 'quick-box' },
       quick,
+      h('p', { class: 'muted small', id: 'quick-hint' }, 'Tap the keyboard mic to dictate'),
       h('div', { class: 'btn-row' }, manualBtn, projectBtn),
       projForm),
     h('div', { class: 'btn-row send-row' }, sendBtn, shareBtn),

@@ -491,9 +491,12 @@ step('+ Add project adds a nickname to the select (blocked names refused)', asyn
   await page.fill('#new-project', 'Orion');
   await page.click('#add-project-go');
   await page.waitForFunction(() => /blocked-word list/.test(document.getElementById('project-err').textContent));
+  await page.fill('#task', 'keep me');
   await page.fill('#new-project', 'Heron');
   await page.click('#add-project-go');
   await page.waitForFunction(() => [...document.querySelectorAll('#nick option')].some((o) => o.value === 'Heron'));
+  if ((await page.inputValue('#task')) !== 'keep me') throw new Error('typed task lost on add project');
+  if (await page.isVisible('#project-form')) throw new Error('add-project field not collapsed');
   const opts = await page.$$eval('#nick option', (o) => o.map((x) => x.value));
   if (opts.includes('Orion')) throw new Error('blocked name added: ' + opts);
   if ((await page.inputValue('#nick')) !== 'Heron') throw new Error('new project not selected');
