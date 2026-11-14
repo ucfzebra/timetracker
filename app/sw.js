@@ -7,7 +7,7 @@ const SHELL = [
   'src/core/quickadd.js', 'src/core/summary.js', 'src/core/time.js', 'src/core/banners.js', 'src/core/patch.js',
   'src/ui/dom.js', 'src/ui/today.js', 'src/ui/edit.js', 'src/ui/week.js',
   'src/send.js', 'src/core/backup.js', 'src/ui/settings.js', 'src/ui/help.js',
-  'icons/icon-192.png', 'icons/icon-512.png', 'icons/apple-touch-icon.png',
+  'icons/mark.svg', 'icons/icon-192.png', 'icons/icon-512.png', 'icons/apple-touch-icon.png',
 ];
 
 self.addEventListener('install', (e) => {

@@ -17,7 +17,8 @@ const APP = fileURLToPath(new URL('../app/', import.meta.url));
 const MIME = {
   '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8',
   '.css': 'text/css; charset=utf-8', '.webmanifest': 'application/manifest+json',
-  '.png': 'image/png', '.json': 'application/json',
+  '.png': 'image/png', '.json': 'application/json', '.svg': 'image/svg+xml',
+  '.woff2': 'font/woff2', '.txt': 'text/plain; charset=utf-8',
 };
 
 function serve() {
@@ -349,7 +350,7 @@ step('Help page renders', async ({ page }) => {
   await page.waitForFunction(() => /Add to Home Screen/.test(document.getElementById('view').textContent));
   const t = await viewText(page);
   if (!t.includes('Win+H') || !t.includes('Run Immediately')) throw new Error('help text');
-  if (!t.includes('Always open Capture from the home-screen icon')) throw new Error('help lacks home-screen warning');
+  if (!t.includes('Always open Shop Clock from the home-screen icon')) throw new Error('help lacks home-screen warning');
 });
 
 step('send without work email is refused with a hint', async ({ page }) => {

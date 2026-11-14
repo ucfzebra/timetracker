@@ -4,16 +4,23 @@
 <meta charset="utf-8">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'self'">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#1f6feb">
+<meta name="theme-color" content="#f7f3ec" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#17140f" media="(prefers-color-scheme: dark)">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-title" content="Capture">
-<title>Capture</title>
+<meta name="apple-mobile-web-app-title" content="Shop Clock">
+<title>Shop Clock</title>
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
-<link rel="icon" href="icons/icon-192.png">
+<link rel="icon" href="icons/mark.svg" type="image/svg+xml">
+<link rel="icon" href="icons/icon-192.png" type="image/png">
 <link rel="stylesheet" href="styles.css">
 </head>
 <body>
+<header id="app-head" class="app-head">
+  <img class="mark" src="icons/mark.svg" alt="" width="32" height="32">
+  <span class="wordmark">SHOP CLOCK</span>
+  <span id="head-date" class="head-date"></span>
+</header>
 <main id="view"></main>
 <nav id="nav" aria-label="Main">
   <a href="#/today" data-route="today">Today</a>

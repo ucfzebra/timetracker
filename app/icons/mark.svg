@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <title>Shop Clock</title>
+  <!-- Chamfered plate: ink fill, steel outline -->
+  <path d="M112 24 H400 L488 112 V400 L400 488 H112 L24 400 V112 Z" fill="#241f1a" stroke="#3d5a6c" stroke-width="20" stroke-linejoin="miter"/>
+  <!-- Clock face -->
+  <circle cx="256" cy="270" r="150" fill="#f7f3ec"/>
+  <!-- Hands -->
+  <path d="M256 270 V160" stroke="#241f1a" stroke-width="26" stroke-linecap="square"/>
+  <path d="M256 270 H340" stroke="#241f1a" stroke-width="26" stroke-linecap="square"/>
+  <rect x="242" y="256" width="28" height="28" fill="#241f1a"/>
+  <!-- Hot-mark diamond -->
+  <path d="M400 56 L432 88 L400 120 L368 88 Z" fill="#c1502e"/>
+  <!-- Drilled dots -->
+  <circle cx="96" cy="88" r="11" fill="#f7f3ec"/>
+  <circle cx="132" cy="88" r="11" fill="#f7f3ec"/>
+  <circle cx="168" cy="88" r="11" fill="#f7f3ec"/>
+</svg>

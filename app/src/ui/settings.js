@@ -125,7 +125,7 @@ export async function render(el, { store, navigate }) {
       const f = file.files[0];
       if (!f) return;
       let data;
-      try { data = JSON.parse(await f.text()); } catch { throw new Error('This is not a Capture backup file.'); }
+      try { data = JSON.parse(await f.text()); } catch { throw new Error('This is not a Shop Clock backup file.'); }
       const local = await store.exportAll();
       const merged = mergeBackup(local, data);
       await store.importRows(merged);

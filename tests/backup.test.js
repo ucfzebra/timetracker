@@ -14,10 +14,10 @@ test('makeBackup shape', () => {
 });
 
 test('rejects bad format or version', () => {
-  assert.throws(() => mergeBackup(local(), { format: 'nope', version: 1 }), /not a Capture backup/);
+  assert.throws(() => mergeBackup(local(), { format: 'nope', version: 1 }), /not a Shop Clock backup/);
   assert.throws(() => mergeBackup(local(), inc({ version: 2 })), /version/);
-  assert.throws(() => mergeBackup(local(), null), /not a Capture backup/);
-  assert.throws(() => mergeBackup(local(), inc({ entries: 'x' })), /not a Capture backup/);
+  assert.throws(() => mergeBackup(local(), null), /not a Shop Clock backup/);
+  assert.throws(() => mergeBackup(local(), inc({ entries: 'x' })), /not a Shop Clock backup/);
 });
 
 test('newer incoming wins, older ignored, new added', () => {

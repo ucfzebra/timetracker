@@ -1,5 +1,7 @@
 import { createStore } from './store/store.js';
 import { openIdbBackend } from './store/idb.js';
+import { prettyDate } from './ui/dom.js';
+import { localDate } from './core/time.js';
 
 const ROUTES = {
   today: './ui/today.js',
@@ -67,6 +69,8 @@ async function boot() {
     const mine = ++token;
     const isCurrent = () => mine === token;
     const { name, params } = parseHash(location.hash);
+    const headDate = document.getElementById('head-date');
+    if (headDate) headDate.textContent = prettyDate(localDate(new Date()));
     for (const a of document.querySelectorAll('#nav a')) {
       a.classList.toggle('active', a.dataset.route === NAV_ACTIVE[name]);
     }
@@ -120,5 +124,5 @@ if ('serviceWorker' in navigator) {
 
 boot().catch((e) => {
   console.error(e);
-  document.getElementById('view').textContent = 'Capture failed to start: ' + e.message;
+  document.getElementById('view').textContent = 'Shop Clock failed to start: ' + e.message;
 });
