@@ -152,6 +152,7 @@ step('header shows SHOP CLOCK; stats card shows today and week / 40.0', async ({
 step('idle shows a START button at least 64px tall', async ({ page }) => {
   const b = await page.$eval('#start', (el) => ({ text: el.textContent, h: el.getBoundingClientRect().height }));
   if (b.text !== 'START' || b.h < 64) throw new Error('start: ' + JSON.stringify(b));
+  await viewText(page); // no stray null/undefined slots on idle Today
 });
 
 step('start timer', async ({ page }) => {
@@ -193,6 +194,7 @@ step('quick add opens Edit prefilled, Save stores it', async ({ page }) => {
   await page.fill('#quick', 'Falcon design review 9 to 11:45');
   await page.press('#quick', 'Enter');
   await page.waitForSelector('#save');
+  await viewText(page); // no stray null/undefined slots on Edit
   const v = await page.evaluate(() => ({
     nick: document.getElementById('nick').value, task: document.getElementById('task').value,
     start: document.getElementById('start').value, end: document.getElementById('end').value,

@@ -140,7 +140,7 @@ export async function render(el, { store, navigate }) {
   el.append(
     h('h1', {}, 'Settings'),
     note,
-    h('h2', {}, 'Nicknames'),
+    h('h2', {}, 'Project nicknames'),
     hintEl || '', list, err,
     h('div', { class: 'btn-row' }, addInput, addBtn),
     h('h2', {}, 'Blocked words'),
