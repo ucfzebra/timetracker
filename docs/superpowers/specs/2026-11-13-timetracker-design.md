@@ -142,7 +142,7 @@ the phone. Any nickname the work side hasn't seen yet shows up there as
 
 ---
 
-## 6. Phone app ("Capture")
+## 6. Phone app ("Shop Clock", formerly "Capture")
 
 ### 6.1 Platform
 - A **progressive web app** (a website you can add to the home screen, works
@@ -302,6 +302,70 @@ with a 🎤 button. You speak or type one sentence and the app fills in the form
   (the ones above plus edge cases), and both apps must pass the same table.
 
 ---
+
+### 6.7 Visual design (Shop Clock)
+
+The phone app is named **Shop Clock** and uses the owner's personal design system
+(brand tokens: Day Shop light theme by default, Night Shop dark theme under
+`prefers-color-scheme: dark`). The 6.2 mock-ups still describe the flows; this section
+describes the look.
+
+- **Paper, not glass.** Flat parchment surfaces (`surface-100` page, `surface-200` cards),
+  hairline `border` outlines, only `shadow-sm` / `shadow-md`, no gradients or blur.
+- **One hot, one cool.** `accent` (ember) is the primary action (START, STOP, Save);
+  `steel` is the secondary action (SWITCH TASK fill, outline buttons, links, nickname tags).
+  success / warning / danger appear only for real states and always with a word
+  ("Done", "HEADS UP", "TIMECARD", "Archive").
+- **Shapes.** 4 px inputs and tags, 8 px buttons and cards, 16 px panels (stats and timer
+  cards). Nothing pill-shaped.
+- **Type** (self-hosted woff2, latin subset, OFL-1.1, precached for offline use):
+  Space Grotesk 600 for the wordmark and page titles, Inter 400/600 for UI text,
+  IBM Plex Mono 500 for every number (hours, times, durations, the running clock).
+- **Tokens only.** Hex values live once in `:root` and once in the dark media query of
+  `app/styles.css`; `tests/contrast.test.js` checks every text/background pair the
+  stylesheet uses is at least 4.5:1 in both themes. Accent text on surfaces is below
+  4.5:1 in Day Shop, so accent is never used for text on a surface: the active nav item is
+  ink with a 3 px accent bar.
+- **Mark.** `app/icons/mark.svg`: a chamfered ink plate with a steel outline, a parchment
+  clock face with two hands, an ember diamond hot-mark and three drilled dots. PNG icons
+  are rasterized from it with `node tools/make_icons.mjs`.
+- **Touch.** Timer buttons are at least 64 px tall at 20 px Inter 600; quick add and the
+  add buttons are 52 px; every control shows a 3 px steel focus ring and a 1 px press.
+
+Home screen (Today), top to bottom:
+
+```
++------------------------------------------+
+| [mark] SHOP CLOCK              Thu Nov 12|
++------------------------------------------+
+| TIMECARD                                 |   banners: flat cards, word label
+| Submit your week timecard [Week submitted ✓] [x]
++------------------------------------------+
+| TODAY            | THIS WEEK             |   stats card (radius 16)
+| 6.4 h            | 36.3                  |
+| of 10.0 · 64%    | / 40.0 h · 90%        |   Fri–Sun: "Day off"
+| [=======-----]   | [===========-]        |   steel fill; success + "Done" at 100%
++------------------------------------------+
+| ● RUNNING                                |   timer card (running)
+| Falcon · bracket redesign                |
+| 01:12:09                                 |   mono, ~52 px
+| [   STOP   ]  [ SWITCH TASK ]            |   accent / steel, 64 px
++------------------------------------------+
+  (idle: Project ▾, Task, Note, [ START ] full width)
+[ Quick add — e.g. Falcon review 9 to 11:45 (tap 🎤 to dictate) ]
+[ + Add task ]  [ + Add project ]              "project" = nickname, added inline
+[ Send ]        [ Share with attachment ]
+TODAY ------------------------------- 6.4 h
+11:45–13:51               [Kestrel]  2.1 ›
+vendor call
++------------------------------------------+
+|  Today  |  Week  |  Settings             |   active: ink label + accent top bar
++------------------------------------------+
+```
+
+SWITCH TASK stops the running timer and starts one from the Project/Task fields. While
+a timer runs those fields are hidden; the first tap (or any tap with no task typed)
+reveals and focuses them instead of switching.
 
 ## 7. Email contract (phone → work)
 
