@@ -1,14 +1,15 @@
-import { h, hmm, prettyDate, busy } from './dom.js';
+import { h, hmm, busy } from './dom.js';
 import { parseQuickAdd } from '../core/quickadd.js';
-import { dayTotals } from '../core/summary.js';
+import { dayTotals, homeStats } from '../core/summary.js';
 import { todayBanners } from '../core/banners.js';
 import { loadSendInput, prepareSend, deliver } from '../send.js';
 import { guardDecision } from '../core/guard.js';
-import { localDate, weekStart, toTenths, formatTenths } from '../core/time.js';
+import { localDate, weekStart, addDays, toTenths, formatTenths } from '../core/time.js';
 
 let tick = null;
 const dismissed = new Set(); // banner kinds dismissed for this session
 let flash = null; // one-shot message shown by the next Today render (e.g. after a send)
+let pickNick = null; // project nickname just added inline; preselected by the next render
 
 function stopTick() {
   if (tick) clearInterval(tick);
@@ -34,14 +35,14 @@ function firstRun(el, { store, navigate }) {
       err.textContent = e.message;
     }
   });
-  el.append(
-    h('h1', {}, 'Add your first nickname'),
+  el.append(h('section', { class: 'card first-run' },
+    h('h1', {}, 'Add your first project nickname'),
     h('p', { class: 'muted' }, 'A nickname is a short code name for a project. No real project names or charge numbers on this phone.'),
-    h('label', { for: 'first-nick' }, 'Nickname'),
+    h('label', { for: 'first-nick' }, 'Project nickname'),
     input,
     err,
-    h('p', {}, h('button', { class: 'primary', id: 'first-add', onclick: add }, 'Add')),
-  );
+    h('button', { class: 'primary big wide', id: 'first-add', onclick: add }, 'Add'),
+  ));
 }
 
 export async function render(el, ctx) {
@@ -52,8 +53,10 @@ export async function render(el, ctx) {
 
   const now = new Date();
   const today = localDate(now);
-  const [todays, run, stale, lastSentAt, weekAckFor, lastBackupAt, recent, sendInput] = await Promise.all([
+  const monday = weekStart(today);
+  const [todays, weekEntries, run, stale, lastSentAt, weekAckFor, lastBackupAt, recent, sendInput] = await Promise.all([
     store.entriesBetween(today, today),
+    store.entriesBetween(monday, addDays(monday, 6)),
     store.running(),
     store.staleTimer(),
     store.getSetting('lastSentAt'),
@@ -89,10 +92,13 @@ export async function render(el, ctx) {
   };
 
   // ---- banners
+  const LABEL = { stale: 'HEADS UP', unsent: 'NOT SENT', week: 'TIMECARD', backup: 'BACKUP' };
   const banners = h('div', { id: 'banners' });
   for (const b of todayBanners({ now, lastSentAt, weekAckFor, entries: recent, stale, lastBackupAt })) {
     if (dismissed.has(b.kind)) continue;
-    const box = h('div', { class: 'banner banner-' + b.kind, role: 'status' }, h('span', { class: 'banner-text' }, b.text));
+    const box = h('div', { class: 'banner banner-' + b.kind, role: 'status' },
+      h('span', { class: 'banner-label' }, LABEL[b.kind] || 'HEADS UP'),
+      h('span', { class: 'banner-text' }, b.text));
     if (b.kind === 'stale') {
       box.append(h('button', { onclick: () => navigate('#/edit/' + encodeURIComponent(b.entryId)) }, 'Set end time'));
     }
@@ -110,9 +116,31 @@ export async function render(el, ctx) {
     banners.append(box);
   }
 
-  // ---- form
+  // ---- stats card
+  const st = homeStats(weekEntries, today);
+  const bar = (done, value, max, label) => h('progress', { class: done ? 'bar done' : 'bar', max, value: Math.min(value, max), 'aria-label': label });
+  const doneWord = h('span', { class: 'done-word' }, '✓ Done');
+  const dayStat = h('div', { class: 'stat', id: 'stat-today' },
+    h('div', { class: 'stat-label' }, 'TODAY'),
+    h('div', { class: 'stat-big mono' }, h('span', { id: 'stat-today-h' }, formatTenths(st.day.tenths)), h('span', { class: 'unit' }, ' h')),
+    st.day.dayOff
+      ? h('div', { class: 'stat-sub', id: 'stat-today-sub' }, 'Day off')
+      : h('div', { class: 'stat-sub', id: 'stat-today-sub' }, h('span', { class: 'mono' }, `of ${formatTenths(st.day.expected)}`), ' · ',
+        st.day.done ? doneWord : h('span', { class: 'mono' }, `${st.day.pct}%`)),
+    st.day.dayOff ? null : bar(st.day.done, st.day.tenths, st.day.expected, 'Today progress'));
+  const weekStat = h('div', { class: 'stat', id: 'stat-week' },
+    h('div', { class: 'stat-label' }, 'THIS WEEK'),
+    h('div', { class: 'stat-big mono' }, h('span', { id: 'stat-week-h' }, formatTenths(st.week.tenths))),
+    h('div', { class: 'stat-sub' }, h('span', { class: 'mono' }, `/ ${formatTenths(st.week.expected)} h`), ' · ',
+      st.week.done ? doneWord.cloneNode(true) : h('span', { class: 'mono' }, `${st.week.pct}%`)),
+    bar(st.week.done, st.week.tenths, st.week.expected, 'Week progress'));
+  const stats = h('section', { class: 'stats', id: 'stats', 'aria-label': 'Hours' }, dayStat, weekStat);
+
+  // ---- timer fields
   const sel = h('select', { id: 'nick' }, nicks.map((n) => h('option', { value: n }, n)));
   if (run && nicks.includes(run.nickname)) sel.value = run.nickname;
+  else if (pickNick && nicks.includes(pickNick)) sel.value = pickNick;
+  pickNick = null;
   const task = h('input', { id: 'task', type: 'text', maxlength: 60, list: 'tasks', placeholder: 'What are you working on?', autocomplete: 'off' });
   const note = h('input', { id: 'note', type: 'text', maxlength: 200, placeholder: 'Optional note', autocomplete: 'off' });
   const tasks = h('datalist', { id: 'tasks' });
@@ -122,6 +150,10 @@ export async function render(el, ctx) {
   };
   sel.addEventListener('change', loadTasks);
   loadTasks();
+  const fields = h('div', { class: 'start-fields', id: 'start-fields' },
+    h('label', { for: 'nick' }, 'Project'), sel,
+    h('label', { for: 'task' }, 'Task'), task, tasks,
+    h('label', { for: 'note' }, 'Note'), note);
 
   // fn returns false when it navigated elsewhere or was cancelled (no refresh then).
   const act = (fn) => busy(async () => {
@@ -137,34 +169,38 @@ export async function render(el, ctx) {
     await store.startTimer(sel.value, t, d);
     return true;
   };
-  const startBtn = h('button', { class: 'primary', id: 'start', onclick: act(startFromForm) }, '▶ Start timer');
-  const manualBtn = h('button', {
-    id: 'manual',
-    onclick: () => {
-      sessionStorage.setItem('capture.prefill', JSON.stringify({
-        nickname: sel.value, task: task.value.trim(), description: note.value.trim(), date: today,
-      }));
-      navigate('#/edit/new');
-    },
-  }, '+ Manual');
 
-  // ---- running card
-  let runCard = null;
+  // ---- timer card
+  let timerCard;
   if (run) {
-    const clock = h('span', { class: 'clock', id: 'clock' }, elapsed(run));
-    runCard = h('div', { class: 'card running', id: 'running' },
-      h('div', {}, h('strong', {}, '● RUNNING '), run.nickname),
-      h('div', { class: 'run-line' }, h('span', { id: 'run-task' }, run.task || '(no task)'), clock),
-      h('div', { class: 'btn-row' },
+    const clock = h('div', { class: 'clock mono', id: 'clock', role: 'timer' }, elapsed(run));
+    fields.hidden = true;
+    // SWITCH TASK = stop this timer and start the one in the fields. With no task typed
+    // yet it only reveals the fields, so a stray tap never switches to an empty task.
+    const switchTask = async () => {
+      if (fields.hidden || !task.value.trim()) {
+        fields.hidden = false;
+        task.focus();
+        return false;
+      }
+      return startFromForm();
+    };
+    timerCard = h('section', { class: 'card timer is-running', id: 'running' },
+      h('div', { class: 'run-label' }, h('span', { class: 'dot', 'aria-hidden': 'true' }, '●'), ' RUNNING'),
+      h('div', { class: 'run-what' }, h('span', { class: 'run-nick' }, run.nickname), ' · ', h('span', { id: 'run-task' }, run.task || '(no task)')),
+      clock,
+      fields,
+      h('div', { class: 'timer-btns' },
         h('button', {
-          id: 'stop', class: 'primary',
+          id: 'stop', class: 'primary big',
           onclick: act(async () => {
             if (await staleGuard()) return false;
             await store.stopTimer();
             return true;
           }),
-        }, '■ Stop'),
-        h('button', { id: 'switch', onclick: act(startFromForm) }, '⇄ Switch')),
+        }, 'STOP'),
+        h('button', { id: 'switch', class: 'steel big', onclick: act(switchTask) }, 'SWITCH TASK')),
+      msg,
     );
     // Each interval clears only itself, so a superseded render can never stop the
     // clock of the screen that replaced it.
@@ -180,10 +216,16 @@ export async function render(el, ctx) {
       }, 1000);
       tick = id;
     }
+  } else {
+    timerCard = h('section', { class: 'card timer', id: 'timer' },
+      fields,
+      h('button', { class: 'primary big wide', id: 'start', onclick: act(startFromForm) }, 'START'),
+      msg,
+    );
   }
 
   // ---- quick add
-  const quick = h('input', { id: 'quick', type: 'text', placeholder: 'e.g. Falcon design review 9 to 11:45', autocomplete: 'off', enterkeyhint: 'go' });
+  const quick = h('input', { id: 'quick', class: 'quick', type: 'text', placeholder: 'Quick add — e.g. Falcon review 9 to 11:45 (tap 🎤 to dictate)', autocomplete: 'off', enterkeyhint: 'go', 'aria-label': 'Quick add' });
   let quickBusy = false;
   const quickGo = async () => {
     if (quickBusy) return;
@@ -220,6 +262,43 @@ export async function render(el, ctx) {
   };
   quick.addEventListener('keydown', (e) => { if (e.key === 'Enter') quickGo(); });
 
+  const manualBtn = h('button', {
+    id: 'manual', class: 'tall',
+    onclick: () => {
+      sessionStorage.setItem('capture.prefill', JSON.stringify({
+        nickname: sel.value, task: task.value.trim(), description: note.value.trim(), date: today,
+      }));
+      navigate('#/edit/new');
+    },
+  }, '+ Add task');
+
+  // ---- add project (a nickname) inline
+  const projErr = h('p', { class: 'error', role: 'alert', id: 'project-err' });
+  const projInput = h('input', { id: 'new-project', type: 'text', maxlength: 24, placeholder: 'e.g. Heron', autocomplete: 'off', enterkeyhint: 'done' });
+  const addProject = busy(async () => {
+    projErr.textContent = '';
+    try {
+      const row = await store.addNickname(projInput.value);
+      pickNick = row.name;
+      await refresh();
+    } catch (e) {
+      projErr.textContent = e.message || String(e);
+    }
+  });
+  projInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') addProject({ currentTarget: null }); });
+  const projForm = h('div', { class: 'card project-form', id: 'project-form', hidden: true },
+    h('label', { for: 'new-project' }, 'Project nickname'),
+    h('div', { class: 'inline' }, projInput, h('button', { id: 'add-project-go', class: 'steel', onclick: addProject }, 'Add')),
+    projErr);
+  const projectBtn = h('button', {
+    id: 'add-project', class: 'tall', 'aria-controls': 'project-form', 'aria-expanded': 'false',
+    onclick: (ev) => {
+      projForm.hidden = !projForm.hidden;
+      ev.currentTarget.setAttribute('aria-expanded', String(!projForm.hidden));
+      if (!projForm.hidden) projInput.focus();
+    },
+  }, '+ Add project');
+
   // ---- list
   const totals = dayTotals(todays, today);
   const sorted = [...todays].sort((a, b) => {
@@ -231,10 +310,10 @@ export async function render(el, ctx) {
     const isRun = e.start && !e.end;
     const when = isRun ? `${e.start}– now` : e.start ? `${e.start}–${e.end}` : `${hmm(e.duration_min)} (dur)`;
     list.append(h('a', { class: 'entry', href: '#/edit/' + encodeURIComponent(e.entry_id) },
-      h('span', { class: 'when' }, when),
-      h('span', { class: 'nick' }, e.nickname),
-      h('span', { class: 'tenths' }, isRun ? '' : formatTenths(toTenths(e.duration_min))),
-      h('span', { class: 'chev' }, '›'),
+      h('span', { class: 'when mono' }, when),
+      h('span', { class: 'nick tag' }, e.nickname),
+      h('span', { class: 'tenths mono' }, isRun ? '' : formatTenths(toTenths(e.duration_min))),
+      h('span', { class: 'chev', 'aria-hidden': 'true' }, '›'),
       h('span', { class: 'etask' }, e.task || '(no task)'),
     ));
   }
@@ -272,26 +351,20 @@ export async function render(el, ctx) {
       sendOut.append(h('p', { class: 'error', role: 'alert' }, e.message || String(e)));
     }
   });
-  const sendBtn = h('button', { id: 'send', class: 'primary', onclick: doSend('mailto') }, '⇪ Send');
+  const sendBtn = h('button', { id: 'send', onclick: doSend('mailto') }, 'Send');
   const shareBtn = h('button', { id: 'share', onclick: doSend('share') }, 'Share with attachment');
 
   el.append(
-    h('header', { class: 'top' }, h('h1', {}, prettyDate(today)), sendBtn),
-    h('div', { class: 'share-row' }, shareBtn),
-    sendOut,
     banners,
-    runCard,
-    h('div', { class: 'card' },
-      h('label', { for: 'quick' }, 'Quick add'),
+    stats,
+    timerCard,
+    h('section', { class: 'quick-box' },
       quick,
-      h('p', { class: 'muted small' }, '🎤 tap the keyboard mic to dictate, then press go.'),
-    ),
-    h('label', { for: 'nick' }, 'Nickname'), sel,
-    h('label', { for: 'task' }, 'Task'), task, tasks,
-    h('label', { for: 'note' }, 'Note'), note,
-    msg,
-    h('div', { class: 'btn-row' }, startBtn, manualBtn),
-    h('div', { class: 'section-head' }, h('h2', {}, 'TODAY'), h('span', { id: 'day-total', class: 'day-total' }, formatTenths(totals.totalTenths) + ' h')),
+      h('div', { class: 'btn-row' }, manualBtn, projectBtn),
+      projForm),
+    h('div', { class: 'btn-row send-row' }, sendBtn, shareBtn),
+    sendOut,
+    h('div', { class: 'section-head' }, h('h2', {}, 'Today'), h('span', { id: 'day-total', class: 'day-total mono' }, formatTenths(totals.totalTenths) + ' h')),
     list,
   );
 }

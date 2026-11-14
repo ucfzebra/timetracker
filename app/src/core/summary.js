@@ -42,3 +42,22 @@ export function weekGrid(entries, anyDate) {
     expectedPerDay: [...EXPECTED_PER_DAY],
   };
 }
+
+// Today and this-week progress for the Today stats card. Days with nothing expected
+// (Fri–Sun) are a day off: no percentage, never "done".
+export function homeStats(entries, today) {
+  const g = weekGrid(entries, today);
+  const i = g.days.indexOf(today);
+  const pct = (t, x) => Math.floor((t * 100) / x);
+  const dayTenths = g.dayTotals[i];
+  const dayExpected = g.expectedPerDay[i];
+  const dayOff = dayExpected === 0;
+  return {
+    day: {
+      tenths: dayTenths, expected: dayExpected, dayOff,
+      pct: dayOff ? null : pct(dayTenths, dayExpected),
+      done: !dayOff && dayTenths >= dayExpected,
+    },
+    week: { tenths: g.total, expected: g.expected, pct: pct(g.total, g.expected), done: g.total >= g.expected },
+  };
+}

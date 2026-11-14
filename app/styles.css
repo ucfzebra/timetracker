@@ -258,3 +258,114 @@ button.danger { color: var(--danger); border-color: var(--danger); }
 .warn { border: 2px solid var(--danger); border-radius: var(--radius-md); background: var(--surface-200); padding: var(--space-3); margin: var(--space-3) 0; }
 .warn p { margin: 0; }
 .flag { border-color: var(--danger); border-width: 2px; }
+
+/* ---- big buttons (timer, first run) */
+button.big {
+  min-height: 64px;
+  font-size: 20px;
+  line-height: 24px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  padding: var(--space-2);
+  border-radius: var(--radius-md);
+}
+button.wide { display: block; width: 100%; margin-top: var(--space-4); }
+button.tall { min-height: 52px; }
+
+/* ---- Today: stats card */
+.stats {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-4);
+  background: var(--surface-200);
+  border: var(--hairline);
+  border-radius: var(--radius-lg);
+  padding: var(--space-4);
+  margin: var(--space-3) 0;
+}
+.stat { min-width: 0; }
+.stat + .stat { border-left: var(--hairline); padding-left: var(--space-4); }
+.stat-label { font-size: 12px; line-height: 16px; font-weight: 600; letter-spacing: 0.08em; color: var(--ink-muted); }
+.stat-big { font-size: 40px; line-height: 48px; white-space: nowrap; }
+.stat-big .unit { font-size: 20px; }
+.stat-sub { font-size: 14px; line-height: 20px; color: var(--ink-muted); min-height: 20px; }
+.done-word { color: var(--success); font-weight: 600; }
+progress.bar {
+  -webkit-appearance: none;
+  appearance: none;
+  display: block;
+  width: 100%;
+  height: 8px;
+  margin-top: var(--space-2);
+  border: var(--hairline);
+  border-radius: var(--radius-sm);
+  background: var(--surface-100);
+  overflow: hidden;
+}
+progress.bar::-webkit-progress-bar { background: var(--surface-100); }
+progress.bar::-webkit-progress-value { background: var(--steel); }
+progress.bar::-moz-progress-bar { background: var(--steel); }
+progress.bar.done::-webkit-progress-value { background: var(--success); }
+progress.bar.done::-moz-progress-bar { background: var(--success); }
+
+/* ---- Today: timer card */
+.timer { border-radius: var(--radius-lg); padding: var(--space-4); }
+.timer .start-fields > label:first-child { margin-top: 0; }
+.timer.is-running { border: 2px solid var(--accent); }
+.run-label { font-size: 13px; line-height: 20px; font-weight: 600; letter-spacing: 0.1em; }
+.run-label .dot { color: var(--accent); }
+.run-what { margin-top: var(--space-1); overflow-wrap: anywhere; }
+.run-nick { font-weight: 600; }
+.clock {
+  font-size: 52px;
+  line-height: 60px;
+  letter-spacing: -0.02em;
+  margin: var(--space-2) 0 var(--space-1);
+}
+.timer .start-fields { margin-bottom: var(--space-2); }
+.timer-btns { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-3); margin-top: var(--space-4); }
+
+/* ---- Today: quick add, add task / project, send */
+.quick-box { margin: var(--space-6) 0 var(--space-3); }
+input.quick { min-height: 52px; }
+.quick-box .btn-row { margin-bottom: 0; }
+.project-form { margin-top: var(--space-3); }
+.project-form label { margin-top: 0; }
+.inline { display: flex; gap: var(--space-2); }
+.inline > button { flex: none; min-width: 72px; }
+.send-row { margin-top: var(--space-3); }
+
+/* ---- Today: entries list */
+.section-head { display: flex; justify-content: space-between; align-items: baseline; border-bottom: 2px solid var(--ink); margin-top: var(--space-6); }
+.section-head h2 { margin: 0 0 var(--space-1); }
+.day-total { font-size: 18px; }
+.entry {
+  display: grid;
+  grid-template-columns: 1fr auto auto auto;
+  align-items: center;
+  gap: var(--space-1) var(--space-3);
+  padding: var(--space-3) 0;
+  border-bottom: var(--hairline);
+  color: var(--ink);
+  text-decoration: none;
+}
+.entry .when { font-size: 15px; }
+.tag {
+  display: inline-block;
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-sm);
+  background: var(--steel);
+  color: var(--steel-ink);
+  font-size: 13px;
+  line-height: 22px;
+  font-weight: 600;
+  max-width: 10em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.entry .tenths { text-align: right; min-width: 2.5em; }
+.entry .chev { color: var(--ink-muted); }
+.entry .etask { grid-column: 1 / -1; color: var(--ink); }
+.first-run { border-radius: var(--radius-lg); }
+.timer-btns button { white-space: nowrap; padding-left: var(--space-1); padding-right: var(--space-1); }

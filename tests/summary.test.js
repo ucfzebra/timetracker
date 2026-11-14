@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { dayTotals, weekGrid } from '../app/src/core/summary.js';
+import { dayTotals, weekGrid, homeStats } from '../app/src/core/summary.js';
 
 const e = (nickname, date, duration_min, extra = {}) => ({
   entry_id: Math.random().toString(36).slice(2), nickname, date, start: '08:00', end: '09:00',
@@ -50,4 +50,35 @@ test('weekGrid for 2026-11-13', () => {
 test('weekGrid ties sort by name', () => {
   const g = weekGrid([e('B', '2026-11-09', 60), e('A', '2026-11-09', 60)], '2026-11-09');
   assert.deepEqual(g.rows.map(r => r.nickname), ['A', 'B']);
+});
+
+// 2026-11-09 is a Monday; 2026-11-12 Thursday; 2026-11-13 Friday.
+test('homeStats: workday shows today vs 10.0 and week vs 40.0', () => {
+  const s = homeStats([
+    e('Falcon', '2026-11-09', 600), e('Heron', '2026-11-12', 255), e('Falcon', '2026-11-12', 126),
+  ], '2026-11-12');
+  assert.deepEqual(s.day, { tenths: 64, expected: 100, dayOff: false, pct: 64, done: false });
+  assert.deepEqual(s.week, { tenths: 164, expected: 400, pct: 41, done: false });
+});
+
+test('homeStats: Friday is a day off (no percentage), weekend hours still count', () => {
+  const s = homeStats([e('Falcon', '2026-11-13', 60)], '2026-11-13');
+  assert.deepEqual(s.day, { tenths: 10, expected: 0, dayOff: true, pct: null, done: false });
+  assert.equal(s.week.tenths, 10);
+});
+
+test('homeStats: reaching the expected hours marks done', () => {
+  const four = ['09', '10', '11', '12'].map((d) => e('Falcon', `2026-11-${d}`, 600));
+  const s = homeStats([...four, e('Falcon', '2026-11-12', 30)], '2026-11-12');
+  assert.equal(s.day.done, true);
+  assert.equal(s.day.pct, 105);
+  assert.deepEqual(s.week, { tenths: 405, expected: 400, pct: 101, done: true });
+});
+
+test('homeStats: running timers and deleted entries do not count', () => {
+  const s = homeStats([
+    e('Falcon', '2026-11-12', 0, { end: '' }), e('Falcon', '2026-11-12', 60, { deleted: true }),
+  ], '2026-11-12');
+  assert.equal(s.day.tenths, 0);
+  assert.equal(s.week.tenths, 0);
 });

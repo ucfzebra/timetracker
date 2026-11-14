@@ -41,7 +41,7 @@ function serve() {
 const STEPS = [];
 const step = (name, fn) => STEPS.push({ name, fn });
 
-const FIRST_RUN = 'Add your first nickname';
+const FIRST_RUN = 'Add your first project nickname';
 const viewText = async (page) => {
   const [t, stray] = await page.evaluate(() => {
     const view = document.getElementById('view');
@@ -137,6 +137,23 @@ step('first run: add nickname Falcon', async ({ page, url }) => {
   if (opts.join() !== 'Falcon') throw new Error('nicknames: ' + opts);
 });
 
+step('header shows SHOP CLOCK; stats card shows today and week / 40.0', async ({ page }) => {
+  const head = await page.textContent('#app-head');
+  if (!head.includes('SHOP CLOCK')) throw new Error('header: ' + head);
+  const todayH = await page.textContent('#stat-today-h');
+  if (!/^\d+\.\d$/.test(todayH)) throw new Error('today hours: ' + todayH);
+  const week = await page.textContent('#stat-week');
+  if (!week.includes('/ 40.0')) throw new Error('week stat: ' + week);
+  const sub = await page.textContent('#stat-today-sub');
+  const off = [0, 5, 6].includes(new Date().getDay());
+  if (off ? sub !== 'Day off' : !/of 10\.0/.test(sub)) throw new Error('today sub: ' + sub);
+});
+
+step('idle shows a START button at least 64px tall', async ({ page }) => {
+  const b = await page.$eval('#start', (el) => ({ text: el.textContent, h: el.getBoundingClientRect().height }));
+  if (b.text !== 'START' || b.h < 64) throw new Error('start: ' + JSON.stringify(b));
+});
+
 step('start timer', async ({ page }) => {
   await page.fill('#task', 'a');
   await page.click('#start');
@@ -145,9 +162,19 @@ step('start timer', async ({ page }) => {
   if (t !== 'a') throw new Error('run task: ' + t);
   const c = await page.textContent('#clock');
   if (!/^\d\d:\d\d:\d\d$/.test(c)) throw new Error('clock: ' + c);
+  const labels = await page.$$eval('#running .timer-btns button', (b) => b.map((x) => [x.id, x.textContent, x.getBoundingClientRect().height]));
+  if (JSON.stringify(labels.map((l) => l[1])) !== '["STOP","SWITCH TASK"]') throw new Error('buttons: ' + JSON.stringify(labels));
+  if (labels.some((l) => l[2] < 64)) throw new Error('button height: ' + JSON.stringify(labels));
+  if (await page.isVisible('#task')) throw new Error('start fields visible while running');
 });
 
 step('switch to Falcon "b"', async ({ page }) => {
+  // With no task typed, SWITCH TASK only reveals the fields.
+  await page.click('#switch');
+  await page.waitForSelector('#task', { state: 'visible' });
+  if ((await page.evaluate(() => document.activeElement.id)) !== 'task') throw new Error('task not focused');
+  if ((await page.textContent('#run-task')) !== 'a') throw new Error('switched without a task');
+  if ((await page.$$eval('#entries .entry', (r) => r.length)) !== 1) throw new Error('entry added on reveal');
   await page.fill('#task', 'b');
   await page.click('#switch');
   await page.waitForFunction(() => document.getElementById('run-task')?.textContent === 'b');
@@ -452,6 +479,45 @@ step('export, clear database, import restores entries', async ({ page }) => {
   if ((await page.inputValue('#import-file')) !== '') throw new Error('file input not reset');
 });
 
+step('+ Add project adds a nickname to the select (blocked names refused)', async ({ page }) => {
+  await setSetting(page, 'blockedWords', ['Orion']);
+  await goto(page, '#/today');
+  await onToday(page);
+  await page.click('#add-project');
+  await page.waitForSelector('#new-project', { state: 'visible' });
+  if (!(await page.textContent('label[for="new-project"]')).includes('Project nickname')) throw new Error('label');
+  await page.fill('#new-project', 'Orion');
+  await page.click('#add-project-go');
+  await page.waitForFunction(() => /blocked-word list/.test(document.getElementById('project-err').textContent));
+  await page.fill('#new-project', 'Heron');
+  await page.click('#add-project-go');
+  await page.waitForFunction(() => [...document.querySelectorAll('#nick option')].some((o) => o.value === 'Heron'));
+  const opts = await page.$$eval('#nick option', (o) => o.map((x) => x.value));
+  if (opts.includes('Orion')) throw new Error('blocked name added: ' + opts);
+  if ((await page.inputValue('#nick')) !== 'Heron') throw new Error('new project not selected');
+});
+
+step('brand fonts load from the app itself; no request leaves the origin', async ({ page, url, requests }) => {
+  await goto(page, '#/today');
+  await onToday(page);
+  const f = await page.evaluate(async () => {
+    await document.fonts.ready;
+    await Promise.all(['16px Inter', '600 16px Inter', '500 16px "IBM Plex Mono"', '600 16px "Space Grotesk"'].map((x) => document.fonts.load(x)));
+    return {
+      family: getComputedStyle(document.body).fontFamily,
+      loaded: [...document.fonts].filter((x) => x.status === 'loaded').map((x) => `${x.family} ${x.weight}`),
+    };
+  });
+  if (!/^"?Inter"?,/.test(f.family)) throw new Error('body font: ' + f.family);
+  for (const want of ['Inter 400', 'Inter 600', 'IBM Plex Mono 500', 'Space Grotesk 600']) {
+    if (!f.loaded.some((x) => x.replace(/"/g, '') === want)) throw new Error(`font ${want} not loaded: ${f.loaded}`);
+  }
+  const origin = new URL(url).origin;
+  const foreign = requests.filter((u) => !u.startsWith('blob:') && !u.startsWith('data:') && new URL(u).origin !== origin);
+  if (foreign.length) throw new Error('foreign requests: ' + foreign.join(', '));
+  if (!requests.length) throw new Error('no requests recorded');
+});
+
 async function main() {
   const pw = await loadPlaywright();
   const chromium = pw.chromium ?? pw.default.chromium;
@@ -465,12 +531,14 @@ async function main() {
     const ctx = await browser.newContext(device);
     const page = await ctx.newPage();
     const errors = [];
+    const requests = [];
     watch(page, errors);
+    page.on('request', (r) => requests.push(r.url()));
     await page.goto(url);
     await page.waitForSelector('#view');
     for (const s of STEPS) {
       try {
-        await s.fn({ page, errors, url, ctx, browser, device });
+        await s.fn({ page, errors, url, ctx, browser, device, requests });
         if (errors.length) throw new Error('console errors: ' + errors.join(' | '));
         console.log(`  ok   ${s.name}`);
       } catch (e) {
